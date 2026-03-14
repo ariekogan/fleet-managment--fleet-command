@@ -1,0 +1,1352 @@
+{
+  "solution": {
+    "id": "fleet-command",
+    "name": "Fleet Command Center",
+    "version": "1.0.0",
+    "description": "AI-powered fleet management with real-time vehicle tracking, route optimization, and driver safety scoring.",
+    "identity": {
+      "actor_types": [
+        {
+          "key": "fleet_manager",
+          "label": "Fleet Manager",
+          "description": "Fleet operations manager with full access"
+        },
+        {
+          "key": "dispatcher",
+          "label": "Dispatcher",
+          "description": "Dispatch operator"
+        },
+        {
+          "key": "driver",
+          "label": "Driver",
+          "description": "Vehicle driver"
+        }
+      ],
+      "admin_roles": [],
+      "default_actor_type": "fleet_manager",
+      "default_roles": []
+    },
+    "skills": [
+      {
+        "id": "vehicle-tracker",
+        "name": "Vehicle Tracker",
+        "role": "gateway",
+        "description": "Real-time vehicle tracking and geofence monitoring.",
+        "connectors": [
+          "fleet-mcp"
+        ]
+      },
+      {
+        "id": "route-optimizer",
+        "name": "Route Optimizer",
+        "role": "worker",
+        "description": "Route optimization for fleet vehicles.",
+        "connectors": [
+          "fleet-mcp"
+        ]
+      },
+      {
+        "id": "safety-monitor",
+        "name": "Safety Monitor",
+        "role": "worker",
+        "description": "Driver safety monitoring and scoring.",
+        "connectors": [
+          "fleet-mcp"
+        ]
+      }
+    ],
+    "grants": [
+      {
+        "key": "fleet.vehicle_id",
+        "description": "Access grant for a specific vehicle",
+        "issued_by": [
+          "vehicle-tracker"
+        ],
+        "consumed_by": [
+          "route-optimizer",
+          "safety-monitor"
+        ],
+        "ttl_seconds": 3600
+      },
+      {
+        "key": "fleet.driver_id",
+        "description": "Access grant for a driver profile",
+        "issued_by": [
+          "vehicle-tracker"
+        ],
+        "consumed_by": [
+          "safety-monitor"
+        ],
+        "ttl_seconds": 3600
+      }
+    ],
+    "handoffs": [
+      {
+        "id": "tracker-to-optimizer",
+        "from": "vehicle-tracker",
+        "to": "route-optimizer",
+        "trigger": "Route optimization request",
+        "grants_passed": [
+          "fleet.vehicle_id"
+        ],
+        "mechanism": "handoff-controller-mcp"
+      },
+      {
+        "id": "tracker-to-safety",
+        "from": "vehicle-tracker",
+        "to": "safety-monitor",
+        "trigger": "Safety alert escalation",
+        "grants_passed": [
+          "fleet.vehicle_id",
+          "fleet.driver_id"
+        ],
+        "mechanism": "handoff-controller-mcp"
+      }
+    ],
+    "routing": {
+      "telegram": {
+        "default_skill": "vehicle-tracker"
+      }
+    },
+    "platform_connectors": [
+      {
+        "id": "handoff-controller-mcp",
+        "required": true,
+        "description": "Handoff controller for skill-to-skill transfers",
+        "used_by": [
+          "vehicle-tracker",
+          "route-optimizer",
+          "safety-monitor"
+        ]
+      },
+      {
+        "id": "fleet-mcp",
+        "description": "",
+        "required": true,
+        "used_by": []
+      }
+    ],
+    "security_contracts": []
+  },
+  "skills": [
+    {
+      "description": "Real-time vehicle tracking, location queries, fleet status overview, and geofence monitoring.",
+      "version": "1.0.0",
+      "phase": "DEPLOYED",
+      "problem": {
+        "statement": "Fleet managers need real-time visibility into vehicle locations, status, and geofence compliance.",
+        "context": "Commercial fleet with 15+ vehicles in the Tel Aviv metropolitan area.",
+        "goals": [
+          "Provide real-time vehicle positions and status",
+          "Monitor geofence compliance",
+          "Enable quick vehicle lookup"
+        ]
+      },
+      "scenarios": [
+        {
+          "id": "locate_vehicle",
+          "title": "Find the current location and status of a vehicle",
+          "description": "Test scenario for locate vehicle",
+          "steps": [
+            "User says: \"Where is VH-003?\"",
+            "Agent presents results to the user"
+          ],
+          "expected_outcome": "User request for locate vehicle is handled successfully."
+        },
+        {
+          "id": "fleet_status",
+          "title": "Get an overview of fleet status",
+          "description": "Test scenario for fleet status",
+          "steps": [
+            "User says: \"Show me all vehicles\"",
+            "Agent presents results to the user"
+          ],
+          "expected_outcome": "User request for fleet status is handled successfully."
+        },
+        {
+          "id": "geofence_check",
+          "title": "Check geofence compliance",
+          "description": "Test scenario for geofence check",
+          "steps": [
+            "User says: \"Are all vehicles in their zones?\"",
+            "Agent presents results to the user"
+          ],
+          "expected_outcome": "User request for geofence check is handled successfully."
+        }
+      ],
+      "role": {
+        "name": "Fleet Tracking Specialist",
+        "persona": "You are an efficient fleet tracking specialist. Keep responses concise with key data. Include vehicle ID and status in responses.",
+        "goals": [
+          "Provide accurate real-time vehicle positions",
+          "Monitor geofence compliance"
+        ],
+        "limitations": [
+          "Cannot contact drivers directly",
+          "Cannot override safety restrictions"
+        ],
+        "communication_style": {
+          "tone": "technical",
+          "verbosity": "concise"
+        }
+      },
+      "glossary": {},
+      "intents": {
+        "supported": [
+          {
+            "id": "locate_vehicle",
+            "description": "Find the current location and status of a vehicle",
+            "examples": [
+              "Where is VH-003?",
+              "Find truck 42",
+              "Locate the vehicle near Herzliya"
+            ],
+            "maps_to_workflow_resolved": true
+          },
+          {
+            "id": "fleet_status",
+            "description": "Get an overview of fleet status",
+            "examples": [
+              "Show me all vehicles",
+              "How many trucks are moving?",
+              "Fleet overview"
+            ],
+            "maps_to_workflow_resolved": true
+          },
+          {
+            "id": "geofence_check",
+            "description": "Check geofence compliance",
+            "examples": [
+              "Are all vehicles in their zones?",
+              "Any geofence violations?"
+            ],
+            "maps_to_workflow_resolved": true
+          }
+        ],
+        "thresholds": {
+          "accept": 0.8,
+          "clarify": 0.5,
+          "reject": 0.3
+        },
+        "out_of_domain": {
+          "action": "redirect",
+          "message": ""
+        }
+      },
+      "engine": {
+        "rv2": {
+          "max_iterations": 12,
+          "iteration_timeout_ms": 30000,
+          "allow_parallel_tools": false,
+          "on_max_iterations": "escalate"
+        },
+        "hlr": {
+          "enabled": true,
+          "critic": {
+            "enabled": true,
+            "check_interval": 3,
+            "strictness": "medium"
+          },
+          "reflection": {
+            "enabled": true,
+            "depth": "shallow"
+          },
+          "replanning": {
+            "enabled": true,
+            "max_replans": 5
+          }
+        },
+        "autonomy": {
+          "level": "autonomous"
+        },
+        "finalization_gate": {
+          "enabled": true,
+          "max_retries": 3
+        },
+        "internal_error": {
+          "enabled": true,
+          "tool_not_found": {
+            "enter_resolution_after": 1,
+            "retryable": false
+          },
+          "resolution": {
+            "max_iterations": 1,
+            "allowed_capabilities": [
+              "read",
+              "search",
+              "document_output"
+            ]
+          },
+          "loop_detection": {
+            "enabled": true,
+            "identical_call_threshold": 2
+          }
+        },
+        "model": "claude-sonnet-4-20250514",
+        "temperature": 0.2
+      },
+      "toolbox_imports": [],
+      "tools": [
+        {
+          "id": "tool-vehicle-get",
+          "id_status": "permanent",
+          "name": "fleet.vehicle.get",
+          "description": "Get real-time data for a specific vehicle including position, speed, driver, fuel, and status.",
+          "inputs": [
+            {
+              "name": "vehicle_id",
+              "type": "string",
+              "required": true,
+              "description": "Vehicle ID (e.g. VH-003)"
+            }
+          ],
+          "output": {
+            "type": "object",
+            "description": "Result"
+          },
+          "source": {
+            "type": "mcp_bridge",
+            "connection_id": "fleet-mcp",
+            "mcp_tool": "vehicle.get"
+          },
+          "policy": {
+            "allowed": "always"
+          },
+          "mock": {
+            "enabled": true,
+            "mode": "examples",
+            "examples": [
+              {
+                "id": "tool-vehicle-get-auto",
+                "input": {
+                  "vehicle_id": "id-001"
+                },
+                "output": {
+                  "success": true,
+                  "data": {}
+                },
+                "description": "Auto-generated example for fleet.vehicle.get"
+              }
+            ]
+          },
+          "security": {
+            "classification": "public"
+          }
+        },
+        {
+          "id": "tool-vehicles-list",
+          "id_status": "permanent",
+          "name": "fleet.vehicles.list",
+          "description": "List all vehicles in the fleet with optional status and type filter.",
+          "inputs": [
+            {
+              "name": "status",
+              "type": "string",
+              "required": false,
+              "description": "Filter: moving, idle, alert"
+            },
+            {
+              "name": "type",
+              "type": "string",
+              "required": false,
+              "description": "Filter: truck, van, car, motorcycle"
+            },
+            {
+              "name": "limit",
+              "type": "number",
+              "required": false,
+              "description": "Max results (default: 50)"
+            }
+          ],
+          "output": {
+            "type": "object",
+            "description": "Result"
+          },
+          "source": {
+            "type": "mcp_bridge",
+            "connection_id": "fleet-mcp",
+            "mcp_tool": "vehicles.list"
+          },
+          "policy": {
+            "allowed": "always"
+          },
+          "mock": {
+            "enabled": true,
+            "mode": "examples",
+            "examples": [
+              {
+                "id": "tool-vehicles-list-auto",
+                "input": {},
+                "output": {
+                  "results": [
+                    {
+                      "id": 1,
+                      "name": "Example item"
+                    }
+                  ],
+                  "total_count": 1
+                },
+                "description": "Auto-generated example for fleet.vehicles.list"
+              }
+            ]
+          },
+          "security": {
+            "classification": "public"
+          }
+        },
+        {
+          "id": "tool-geofence-check",
+          "id_status": "permanent",
+          "name": "fleet.geofence.check",
+          "description": "Check if vehicles are within their designated geofences. Returns violations.",
+          "inputs": [
+            {
+              "name": "vehicle_id",
+              "type": "string",
+              "required": false,
+              "description": "Check specific vehicle, or omit for all"
+            },
+            {
+              "name": "geofence_id",
+              "type": "string",
+              "required": false,
+              "description": "Check specific geofence"
+            }
+          ],
+          "output": {
+            "type": "object",
+            "description": "Result"
+          },
+          "source": {
+            "type": "mcp_bridge",
+            "connection_id": "fleet-mcp",
+            "mcp_tool": "geofence.check"
+          },
+          "policy": {
+            "allowed": "always"
+          },
+          "mock": {
+            "enabled": true,
+            "mode": "examples",
+            "examples": [
+              {
+                "id": "tool-geofence-check-auto",
+                "input": {},
+                "output": {
+                  "success": true,
+                  "data": {}
+                },
+                "description": "Auto-generated example for fleet.geofence.check"
+              }
+            ]
+          },
+          "security": {
+            "classification": "public"
+          }
+        },
+        {
+          "id": "tool-trip-create",
+          "id_status": "permanent",
+          "name": "fleet.trip.create",
+          "description": "Create a new trip assignment for a vehicle.",
+          "inputs": [
+            {
+              "name": "vehicle_id",
+              "type": "string",
+              "required": true,
+              "description": "Vehicle to assign"
+            },
+            {
+              "name": "origin",
+              "type": "string",
+              "required": true,
+              "description": "Trip starting location"
+            },
+            {
+              "name": "destination",
+              "type": "string",
+              "required": true,
+              "description": "Trip destination"
+            }
+          ],
+          "output": {
+            "type": "object",
+            "description": "Result"
+          },
+          "source": {
+            "type": "mcp_bridge",
+            "connection_id": "fleet-mcp",
+            "mcp_tool": "trip.create"
+          },
+          "policy": {
+            "allowed": "always"
+          },
+          "mock": {
+            "enabled": true,
+            "mode": "examples",
+            "examples": [
+              {
+                "id": "tool-trip-create-auto",
+                "input": {
+                  "vehicle_id": "id-001",
+                  "origin": "example",
+                  "destination": "example"
+                },
+                "output": {
+                  "id": 1,
+                  "status": "created",
+                  "message": "Created successfully."
+                },
+                "description": "Auto-generated example for fleet.trip.create"
+              }
+            ]
+          },
+          "security": {
+            "classification": "public"
+          }
+        },
+        {
+          "id": "tool-route-optimize",
+          "id_status": "permanent",
+          "name": "fleet.route.optimize",
+          "description": "Calculate the optimal route for a vehicle.",
+          "inputs": [
+            {
+              "name": "vehicle_id",
+              "type": "string",
+              "required": true,
+              "description": "Vehicle to route"
+            },
+            {
+              "name": "destination",
+              "type": "string",
+              "required": true,
+              "description": "Destination"
+            },
+            {
+              "name": "optimize_for",
+              "type": "string",
+              "required": false,
+              "description": "time, distance, or fuel"
+            }
+          ],
+          "output": {
+            "type": "object",
+            "description": "Result"
+          },
+          "source": {
+            "type": "mcp_bridge",
+            "connection_id": "fleet-mcp",
+            "mcp_tool": "route.optimize"
+          },
+          "policy": {
+            "allowed": "always"
+          },
+          "mock": {
+            "enabled": true,
+            "mode": "examples",
+            "examples": [
+              {
+                "id": "tool-route-optimize-auto",
+                "input": {
+                  "vehicle_id": "id-001",
+                  "destination": "example"
+                },
+                "output": {
+                  "success": true,
+                  "data": {}
+                },
+                "description": "Auto-generated example for fleet.route.optimize"
+              }
+            ]
+          },
+          "security": {
+            "classification": "public"
+          }
+        },
+        {
+          "id": "tool-route-suggest",
+          "id_status": "permanent",
+          "name": "fleet.route.suggest",
+          "description": "Suggest route alternatives between two points.",
+          "inputs": [
+            {
+              "name": "origin",
+              "type": "string",
+              "required": true,
+              "description": "Start point"
+            },
+            {
+              "name": "destination",
+              "type": "string",
+              "required": true,
+              "description": "End point"
+            }
+          ],
+          "output": {
+            "type": "object",
+            "description": "Result"
+          },
+          "source": {
+            "type": "mcp_bridge",
+            "connection_id": "fleet-mcp",
+            "mcp_tool": "route.suggest"
+          },
+          "policy": {
+            "allowed": "always"
+          },
+          "mock": {
+            "enabled": true,
+            "mode": "examples",
+            "examples": [
+              {
+                "id": "tool-route-suggest-auto",
+                "input": {
+                  "origin": "example",
+                  "destination": "example"
+                },
+                "output": {
+                  "success": true,
+                  "data": {}
+                },
+                "description": "Auto-generated example for fleet.route.suggest"
+              }
+            ]
+          },
+          "security": {
+            "classification": "public"
+          }
+        }
+      ],
+      "meta_tools": [],
+      "triggers": [],
+      "connectors": [
+        "fleet-mcp",
+        "handoff-controller-mcp"
+      ],
+      "policy": {
+        "guardrails": {
+          "never": [],
+          "always": []
+        },
+        "approvals": [],
+        "workflows": [
+          {
+            "name": "Find the current location and status of a vehicle",
+            "description": "Auto-generated workflow for locate_vehicle",
+            "trigger": "locate_vehicle",
+            "steps": [],
+            "required": false,
+            "on_deviation": "warn",
+            "id": "find_the_current_location_and_status_of_a_vehicle_68b1013d",
+            "steps_resolved": []
+          },
+          {
+            "name": "Get an overview of fleet status",
+            "description": "Auto-generated workflow for fleet_status",
+            "trigger": "fleet_status",
+            "steps": [],
+            "required": false,
+            "on_deviation": "warn",
+            "id": "get_an_overview_of_fleet_status_653ec940",
+            "steps_resolved": []
+          },
+          {
+            "name": "Check geofence compliance",
+            "description": "Auto-generated workflow for geofence_check",
+            "trigger": "geofence_check",
+            "steps": [],
+            "required": false,
+            "on_deviation": "warn",
+            "id": "check_geofence_compliance_b191b6fe",
+            "steps_resolved": []
+          }
+        ],
+        "escalation": {
+          "enabled": true,
+          "conditions": [
+            "Critical safety alert detected",
+            "Multiple geofence violations"
+          ],
+          "target": "safety-monitor"
+        }
+      },
+      "channels": [],
+      "id": "vehicle-tracker",
+      "name": "Vehicle Tracker",
+      "ui_capable": false,
+      "ui_plugins": [
+        {
+          "id": "mcp:fleet-ui-mcp:fleet-dashboard",
+          "short_id": "fleet_dash"
+        }
+      ],
+      "output_contract": {
+        "required_fields": [
+          "summary",
+          "tools_used",
+          "data_source",
+          "as_of"
+        ],
+        "format_hint": "Include Summary, Tools used, Data source, and As-of in every final response."
+      },
+      "grant_mappings": [],
+      "access_policy": {
+        "rules": [
+          {
+            "tools": [
+              "*"
+            ],
+            "effect": "allow"
+          }
+        ]
+      },
+      "created_at": "2026-03-01T11:59:17.152Z",
+      "updated_at": "2026-03-13T16:24:51.594Z",
+      "cascading_issues": [],
+      "response_filters": []
+    },
+    {
+      "description": "Route optimization and multi-stop planning.",
+      "version": "1.0.0",
+      "phase": "DEPLOYED",
+      "problem": {
+        "statement": "Dispatchers need optimized routes.",
+        "context": "Dispatchers need optimized routes.",
+        "goals": [
+          "Calculate optimal routes",
+          "Provide route alternatives"
+        ]
+      },
+      "scenarios": [
+        {
+          "id": "optimize_route",
+          "title": "Optimize route for a vehicle",
+          "description": "Test scenario for optimize route",
+          "steps": [
+            "User says: \"Optimize route for VH-003 to Jerusalem\"",
+            "Agent calls fleet.route.optimize — calculate optimal route.",
+            "Agent presents results to the user"
+          ],
+          "expected_outcome": "User request for optimize route is handled successfully."
+        },
+        {
+          "id": "suggest_routes",
+          "title": "Get route suggestions",
+          "description": "Test scenario for suggest routes",
+          "steps": [
+            "User says: \"Show routes from Herzliya to Ashdod\"",
+            "Agent presents results to the user"
+          ],
+          "expected_outcome": "User request for suggest routes is handled successfully."
+        }
+      ],
+      "role": {
+        "name": "Route Optimization Specialist",
+        "persona": "You analyze traffic, distance, and vehicle constraints. Suggest best routes with clear ETA estimates.",
+        "goals": [
+          "Optimize routes",
+          "Provide alternatives"
+        ],
+        "limitations": [
+          "Cannot override driver navigation"
+        ],
+        "communication_style": {
+          "tone": "technical",
+          "verbosity": "concise"
+        }
+      },
+      "glossary": {},
+      "intents": {
+        "supported": [
+          {
+            "id": "optimize_route",
+            "description": "Optimize route for a vehicle",
+            "examples": [
+              "Optimize route for VH-003 to Jerusalem",
+              "Best route to Haifa"
+            ],
+            "maps_to_workflow_resolved": true
+          },
+          {
+            "id": "suggest_routes",
+            "description": "Get route suggestions",
+            "examples": [
+              "Show routes from Herzliya to Ashdod",
+              "Compare routes to Beer Sheva"
+            ],
+            "maps_to_workflow_resolved": true
+          }
+        ],
+        "thresholds": {
+          "accept": 0.8,
+          "clarify": 0.5,
+          "reject": 0.3
+        },
+        "out_of_domain": {
+          "action": "redirect",
+          "message": ""
+        }
+      },
+      "engine": {
+        "rv2": {
+          "max_iterations": 16,
+          "iteration_timeout_ms": 30000,
+          "allow_parallel_tools": false,
+          "on_max_iterations": "ask_user"
+        },
+        "hlr": {
+          "enabled": true,
+          "critic": {
+            "enabled": true,
+            "check_interval": 3,
+            "strictness": "medium"
+          },
+          "reflection": {
+            "enabled": true,
+            "depth": "shallow"
+          },
+          "replanning": {
+            "enabled": true,
+            "max_replans": 5
+          }
+        },
+        "autonomy": {
+          "level": "autonomous"
+        },
+        "finalization_gate": {
+          "enabled": true,
+          "max_retries": 2
+        },
+        "internal_error": {
+          "enabled": true,
+          "tool_not_found": {
+            "enter_resolution_after": 1,
+            "retryable": false
+          },
+          "resolution": {
+            "max_iterations": 1,
+            "allowed_capabilities": [
+              "read",
+              "search",
+              "document_output"
+            ]
+          },
+          "loop_detection": {
+            "enabled": true,
+            "identical_call_threshold": 2
+          }
+        },
+        "model": "claude-sonnet-4-20250514",
+        "temperature": 0.2
+      },
+      "toolbox_imports": [],
+      "tools": [
+        {
+          "id": "tool-route-optimize-2",
+          "id_status": "permanent",
+          "name": "fleet.route.optimize",
+          "description": "Calculate optimal route.",
+          "inputs": [
+            {
+              "name": "vehicle_id",
+              "type": "string",
+              "required": true,
+              "description": "Vehicle to route"
+            },
+            {
+              "name": "destination",
+              "type": "string",
+              "required": true,
+              "description": "Destination"
+            },
+            {
+              "name": "optimize_for",
+              "type": "string",
+              "required": false,
+              "description": "time, distance, or fuel"
+            }
+          ],
+          "output": {
+            "type": "object",
+            "description": "Result"
+          },
+          "source": {
+            "type": "mcp_bridge",
+            "connection_id": "fleet-mcp",
+            "mcp_tool": "route.optimize"
+          },
+          "policy": {
+            "allowed": "always"
+          },
+          "mock": {
+            "enabled": true,
+            "mode": "examples",
+            "examples": [
+              {
+                "id": "tool-route-optimize-auto",
+                "input": {
+                  "vehicle_id": "id-001",
+                  "destination": "example"
+                },
+                "output": {
+                  "success": true,
+                  "data": {}
+                },
+                "description": "Auto-generated example for fleet.route.optimize"
+              }
+            ]
+          },
+          "security": {
+            "classification": "public"
+          }
+        },
+        {
+          "id": "tool-route-suggest-2",
+          "id_status": "permanent",
+          "name": "fleet.route.suggest",
+          "description": "Suggest route alternatives.",
+          "inputs": [
+            {
+              "name": "origin",
+              "type": "string",
+              "required": true,
+              "description": "Start"
+            },
+            {
+              "name": "destination",
+              "type": "string",
+              "required": true,
+              "description": "End"
+            }
+          ],
+          "output": {
+            "type": "object",
+            "description": "Result"
+          },
+          "source": {
+            "type": "mcp_bridge",
+            "connection_id": "fleet-mcp",
+            "mcp_tool": "route.suggest"
+          },
+          "policy": {
+            "allowed": "always"
+          },
+          "mock": {
+            "enabled": true,
+            "mode": "examples",
+            "examples": [
+              {
+                "id": "tool-route-suggest-auto",
+                "input": {
+                  "origin": "example",
+                  "destination": "example"
+                },
+                "output": {
+                  "success": true,
+                  "data": {}
+                },
+                "description": "Auto-generated example for fleet.route.suggest"
+              }
+            ]
+          },
+          "security": {
+            "classification": "public"
+          }
+        }
+      ],
+      "meta_tools": [],
+      "triggers": [],
+      "connectors": [
+        "fleet-mcp"
+      ],
+      "policy": {
+        "guardrails": {
+          "never": [],
+          "always": []
+        },
+        "approvals": [],
+        "workflows": [
+          {
+            "name": "Optimize route for a vehicle",
+            "description": "Auto-generated workflow for optimize_route",
+            "trigger": "optimize_route",
+            "steps": [
+              "fleet.route.optimize"
+            ],
+            "required": false,
+            "on_deviation": "warn",
+            "id": "optimize_route_for_a_vehicle_e996afab",
+            "steps_resolved": [
+              true
+            ]
+          },
+          {
+            "name": "Get route suggestions",
+            "description": "Auto-generated workflow for suggest_routes",
+            "trigger": "suggest_routes",
+            "steps": [],
+            "required": false,
+            "on_deviation": "warn",
+            "id": "get_route_suggestions_acc936cb",
+            "steps_resolved": []
+          }
+        ],
+        "escalation": {
+          "enabled": false,
+          "conditions": [],
+          "target": ""
+        }
+      },
+      "channels": [],
+      "id": "route-optimizer",
+      "name": "Route Optimizer",
+      "access_policy": {
+        "rules": [
+          {
+            "tools": [
+              "*"
+            ],
+            "effect": "allow"
+          }
+        ]
+      },
+      "created_at": "2026-03-01T11:59:17.216Z",
+      "updated_at": "2026-03-13T16:24:58.420Z",
+      "ui_capable": false,
+      "grant_mappings": [],
+      "response_filters": []
+    },
+    {
+      "description": "Driver safety monitoring and scoring.",
+      "version": "1.0.0",
+      "phase": "DEPLOYED",
+      "problem": {
+        "statement": "Fleet managers need real-time safety monitoring.",
+        "context": "Fleet managers need real-time safety monitoring.",
+        "goals": [
+          "Monitor driving behavior",
+          "Calculate safety scores"
+        ]
+      },
+      "scenarios": [
+        {
+          "id": "check_safety",
+          "title": "Check safety alerts",
+          "description": "Test scenario for check safety",
+          "steps": [
+            "User says: \"Any safety alerts?\"",
+            "Agent presents results to the user"
+          ],
+          "expected_outcome": "User request for check safety is handled successfully."
+        },
+        {
+          "id": "driver_score",
+          "title": "Get driver safety score",
+          "description": "Test scenario for driver score",
+          "steps": [
+            "User says: \"Safety score for Yossi Cohen\"",
+            "Agent presents results to the user"
+          ],
+          "expected_outcome": "User request for driver score is handled successfully."
+        }
+      ],
+      "role": {
+        "name": "Safety Monitoring Analyst",
+        "persona": "You monitor driving behavior and flag dangerous patterns. Escalate SOS alerts immediately.",
+        "goals": [
+          "Monitor safety alerts",
+          "Calculate driver safety scores"
+        ],
+        "limitations": [
+          "Cannot dismiss critical alerts"
+        ],
+        "communication_style": {
+          "tone": "technical",
+          "verbosity": "concise"
+        }
+      },
+      "glossary": {},
+      "intents": {
+        "supported": [
+          {
+            "id": "check_safety",
+            "description": "Check safety alerts",
+            "examples": [
+              "Any safety alerts?",
+              "Show critical alerts"
+            ],
+            "maps_to_workflow_resolved": true
+          },
+          {
+            "id": "driver_score",
+            "description": "Get driver safety score",
+            "examples": [
+              "Safety score for Yossi Cohen",
+              "How is VH-007 driver doing?"
+            ],
+            "maps_to_workflow_resolved": true
+          }
+        ],
+        "thresholds": {
+          "accept": 0.8,
+          "clarify": 0.5,
+          "reject": 0.3
+        },
+        "out_of_domain": {
+          "action": "redirect",
+          "message": ""
+        }
+      },
+      "engine": {
+        "rv2": {
+          "max_iterations": 16,
+          "iteration_timeout_ms": 30000,
+          "allow_parallel_tools": false,
+          "on_max_iterations": "ask_user"
+        },
+        "hlr": {
+          "enabled": true,
+          "critic": {
+            "enabled": true,
+            "check_interval": 3,
+            "strictness": "medium"
+          },
+          "reflection": {
+            "enabled": true,
+            "depth": "shallow"
+          },
+          "replanning": {
+            "enabled": true,
+            "max_replans": 5
+          }
+        },
+        "autonomy": {
+          "level": "autonomous"
+        },
+        "finalization_gate": {
+          "enabled": true,
+          "max_retries": 2
+        },
+        "internal_error": {
+          "enabled": true,
+          "tool_not_found": {
+            "enter_resolution_after": 1,
+            "retryable": false
+          },
+          "resolution": {
+            "max_iterations": 1,
+            "allowed_capabilities": [
+              "read",
+              "search",
+              "document_output"
+            ]
+          },
+          "loop_detection": {
+            "enabled": true,
+            "identical_call_threshold": 2
+          }
+        },
+        "model": "claude-sonnet-4-20250514",
+        "temperature": 0.1
+      },
+      "toolbox_imports": [],
+      "tools": [
+        {
+          "id": "tool-safety-alerts",
+          "id_status": "permanent",
+          "name": "fleet.safety.alerts",
+          "description": "Get recent safety alerts.",
+          "inputs": [
+            {
+              "name": "vehicle_id",
+              "type": "string",
+              "required": false,
+              "description": "Filter by vehicle"
+            },
+            {
+              "name": "severity",
+              "type": "string",
+              "required": false,
+              "description": "Filter: low, medium, high, critical"
+            },
+            {
+              "name": "limit",
+              "type": "number",
+              "required": false,
+              "description": "Max results"
+            }
+          ],
+          "output": {
+            "type": "object",
+            "description": "Result"
+          },
+          "source": {
+            "type": "mcp_bridge",
+            "connection_id": "fleet-mcp",
+            "mcp_tool": "safety.alerts"
+          },
+          "policy": {
+            "allowed": "always"
+          },
+          "mock": {
+            "enabled": true,
+            "mode": "examples",
+            "examples": [
+              {
+                "id": "tool-safety-alerts-auto",
+                "input": {},
+                "output": {
+                  "success": true,
+                  "data": {}
+                },
+                "description": "Auto-generated example for fleet.safety.alerts"
+              }
+            ]
+          },
+          "security": {
+            "classification": "public"
+          }
+        },
+        {
+          "id": "tool-safety-score",
+          "id_status": "permanent",
+          "name": "fleet.safety.score",
+          "description": "Calculate driver safety score.",
+          "inputs": [
+            {
+              "name": "driver_name",
+              "type": "string",
+              "required": false,
+              "description": "Driver name"
+            },
+            {
+              "name": "vehicle_id",
+              "type": "string",
+              "required": false,
+              "description": "Or filter by vehicle"
+            },
+            {
+              "name": "period_days",
+              "type": "number",
+              "required": false,
+              "description": "Scoring period (default: 30)"
+            }
+          ],
+          "output": {
+            "type": "object",
+            "description": "Result"
+          },
+          "source": {
+            "type": "mcp_bridge",
+            "connection_id": "fleet-mcp",
+            "mcp_tool": "safety.score"
+          },
+          "policy": {
+            "allowed": "always"
+          },
+          "mock": {
+            "enabled": true,
+            "mode": "examples",
+            "examples": [
+              {
+                "id": "tool-safety-score-auto",
+                "input": {},
+                "output": {
+                  "success": true,
+                  "data": {}
+                },
+                "description": "Auto-generated example for fleet.safety.score"
+              }
+            ]
+          },
+          "security": {
+            "classification": "public"
+          }
+        }
+      ],
+      "meta_tools": [],
+      "triggers": [],
+      "connectors": [
+        "fleet-mcp"
+      ],
+      "policy": {
+        "guardrails": {
+          "never": [],
+          "always": []
+        },
+        "approvals": [],
+        "workflows": [
+          {
+            "name": "Check safety alerts",
+            "description": "Auto-generated workflow for check_safety",
+            "trigger": "check_safety",
+            "steps": [],
+            "required": false,
+            "on_deviation": "warn",
+            "id": "check_safety_alerts_c4a3d48c",
+            "steps_resolved": []
+          },
+          {
+            "name": "Get driver safety score",
+            "description": "Auto-generated workflow for driver_score",
+            "trigger": "driver_score",
+            "steps": [],
+            "required": false,
+            "on_deviation": "warn",
+            "id": "get_driver_safety_score_1dba56e4",
+            "steps_resolved": []
+          }
+        ],
+        "escalation": {
+          "enabled": true,
+          "conditions": [
+            "SOS alerts",
+            "Critical safety events"
+          ],
+          "target": ""
+        }
+      },
+      "channels": [],
+      "id": "safety-monitor",
+      "name": "Safety Monitor",
+      "access_policy": {
+        "rules": [
+          {
+            "tools": [
+              "*"
+            ],
+            "effect": "allow"
+          }
+        ]
+      },
+      "created_at": "2026-03-01T11:59:17.306Z",
+      "updated_at": "2026-03-13T16:25:05.202Z",
+      "ui_capable": false,
+      "grant_mappings": [],
+      "response_filters": []
+    }
+  ],
+  "connectors": [
+    {
+      "id": "handoff-controller-mcp",
+      "required": true,
+      "description": "Handoff controller for skill-to-skill transfers",
+      "used_by": [
+        "vehicle-tracker",
+        "route-optimizer",
+        "safety-monitor"
+      ],
+      "_platform": true
+    },
+    {
+      "id": "fleet-mcp",
+      "description": "",
+      "required": true,
+      "used_by": [],
+      "_platform": true
+    }
+  ],
+  "exported_at": "2026-03-14T18:15:37.176Z",
+  "export_version": "1.0.0"
+}

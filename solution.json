@@ -1,0 +1,129 @@
+{
+  "id": "fleet-command",
+  "name": "Fleet Command Center",
+  "version": "1.0.0",
+  "description": "AI-powered fleet management with real-time vehicle tracking, route optimization, and driver safety scoring.",
+  "identity": {
+    "actor_types": [
+      {
+        "key": "fleet_manager",
+        "label": "Fleet Manager",
+        "description": "Fleet operations manager with full access"
+      },
+      {
+        "key": "dispatcher",
+        "label": "Dispatcher",
+        "description": "Dispatch operator"
+      },
+      {
+        "key": "driver",
+        "label": "Driver",
+        "description": "Vehicle driver"
+      }
+    ],
+    "admin_roles": [],
+    "default_actor_type": "fleet_manager",
+    "default_roles": []
+  },
+  "skills": [
+    {
+      "id": "vehicle-tracker",
+      "name": "Vehicle Tracker",
+      "role": "gateway",
+      "description": "Real-time vehicle tracking and geofence monitoring.",
+      "connectors": [
+        "fleet-mcp"
+      ]
+    },
+    {
+      "id": "route-optimizer",
+      "name": "Route Optimizer",
+      "role": "worker",
+      "description": "Route optimization for fleet vehicles.",
+      "connectors": [
+        "fleet-mcp"
+      ]
+    },
+    {
+      "id": "safety-monitor",
+      "name": "Safety Monitor",
+      "role": "worker",
+      "description": "Driver safety monitoring and scoring.",
+      "connectors": [
+        "fleet-mcp"
+      ]
+    }
+  ],
+  "grants": [
+    {
+      "key": "fleet.vehicle_id",
+      "description": "Access grant for a specific vehicle",
+      "issued_by": [
+        "vehicle-tracker"
+      ],
+      "consumed_by": [
+        "route-optimizer",
+        "safety-monitor"
+      ],
+      "ttl_seconds": 3600
+    },
+    {
+      "key": "fleet.driver_id",
+      "description": "Access grant for a driver profile",
+      "issued_by": [
+        "vehicle-tracker"
+      ],
+      "consumed_by": [
+        "safety-monitor"
+      ],
+      "ttl_seconds": 3600
+    }
+  ],
+  "handoffs": [
+    {
+      "id": "tracker-to-optimizer",
+      "from": "vehicle-tracker",
+      "to": "route-optimizer",
+      "trigger": "Route optimization request",
+      "grants_passed": [
+        "fleet.vehicle_id"
+      ],
+      "mechanism": "handoff-controller-mcp"
+    },
+    {
+      "id": "tracker-to-safety",
+      "from": "vehicle-tracker",
+      "to": "safety-monitor",
+      "trigger": "Safety alert escalation",
+      "grants_passed": [
+        "fleet.vehicle_id",
+        "fleet.driver_id"
+      ],
+      "mechanism": "handoff-controller-mcp"
+    }
+  ],
+  "routing": {
+    "telegram": {
+      "default_skill": "vehicle-tracker"
+    }
+  },
+  "platform_connectors": [
+    {
+      "id": "handoff-controller-mcp",
+      "required": true,
+      "description": "Handoff controller for skill-to-skill transfers",
+      "used_by": [
+        "vehicle-tracker",
+        "route-optimizer",
+        "safety-monitor"
+      ]
+    },
+    {
+      "id": "fleet-mcp",
+      "description": "",
+      "required": true,
+      "used_by": []
+    }
+  ],
+  "security_contracts": []
+}

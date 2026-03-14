@@ -1,0 +1,311 @@
+{
+  "description": "Route optimization and multi-stop planning.",
+  "version": "1.0.0",
+  "phase": "DEPLOYED",
+  "problem": {
+    "statement": "Dispatchers need optimized routes.",
+    "context": "Dispatchers need optimized routes.",
+    "goals": [
+      "Calculate optimal routes",
+      "Provide route alternatives"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "optimize_route",
+      "title": "Optimize route for a vehicle",
+      "description": "Test scenario for optimize route",
+      "steps": [
+        "User says: \"Optimize route for VH-003 to Jerusalem\"",
+        "Agent calls fleet.route.optimize — calculate optimal route.",
+        "Agent presents results to the user"
+      ],
+      "expected_outcome": "User request for optimize route is handled successfully."
+    },
+    {
+      "id": "suggest_routes",
+      "title": "Get route suggestions",
+      "description": "Test scenario for suggest routes",
+      "steps": [
+        "User says: \"Show routes from Herzliya to Ashdod\"",
+        "Agent presents results to the user"
+      ],
+      "expected_outcome": "User request for suggest routes is handled successfully."
+    }
+  ],
+  "role": {
+    "name": "Route Optimization Specialist",
+    "persona": "You analyze traffic, distance, and vehicle constraints. Suggest best routes with clear ETA estimates.",
+    "goals": [
+      "Optimize routes",
+      "Provide alternatives"
+    ],
+    "limitations": [
+      "Cannot override driver navigation"
+    ],
+    "communication_style": {
+      "tone": "technical",
+      "verbosity": "concise"
+    }
+  },
+  "glossary": {},
+  "intents": {
+    "supported": [
+      {
+        "id": "optimize_route",
+        "description": "Optimize route for a vehicle",
+        "examples": [
+          "Optimize route for VH-003 to Jerusalem",
+          "Best route to Haifa"
+        ],
+        "maps_to_workflow_resolved": true
+      },
+      {
+        "id": "suggest_routes",
+        "description": "Get route suggestions",
+        "examples": [
+          "Show routes from Herzliya to Ashdod",
+          "Compare routes to Beer Sheva"
+        ],
+        "maps_to_workflow_resolved": true
+      }
+    ],
+    "thresholds": {
+      "accept": 0.8,
+      "clarify": 0.5,
+      "reject": 0.3
+    },
+    "out_of_domain": {
+      "action": "redirect",
+      "message": ""
+    }
+  },
+  "engine": {
+    "rv2": {
+      "max_iterations": 16,
+      "iteration_timeout_ms": 30000,
+      "allow_parallel_tools": false,
+      "on_max_iterations": "ask_user"
+    },
+    "hlr": {
+      "enabled": true,
+      "critic": {
+        "enabled": true,
+        "check_interval": 3,
+        "strictness": "medium"
+      },
+      "reflection": {
+        "enabled": true,
+        "depth": "shallow"
+      },
+      "replanning": {
+        "enabled": true,
+        "max_replans": 5
+      }
+    },
+    "autonomy": {
+      "level": "autonomous"
+    },
+    "finalization_gate": {
+      "enabled": true,
+      "max_retries": 2
+    },
+    "internal_error": {
+      "enabled": true,
+      "tool_not_found": {
+        "enter_resolution_after": 1,
+        "retryable": false
+      },
+      "resolution": {
+        "max_iterations": 1,
+        "allowed_capabilities": [
+          "read",
+          "search",
+          "document_output"
+        ]
+      },
+      "loop_detection": {
+        "enabled": true,
+        "identical_call_threshold": 2
+      }
+    },
+    "model": "claude-sonnet-4-20250514",
+    "temperature": 0.2
+  },
+  "toolbox_imports": [],
+  "tools": [
+    {
+      "id": "tool-route-optimize-2",
+      "id_status": "permanent",
+      "name": "fleet.route.optimize",
+      "description": "Calculate optimal route.",
+      "inputs": [
+        {
+          "name": "vehicle_id",
+          "type": "string",
+          "required": true,
+          "description": "Vehicle to route"
+        },
+        {
+          "name": "destination",
+          "type": "string",
+          "required": true,
+          "description": "Destination"
+        },
+        {
+          "name": "optimize_for",
+          "type": "string",
+          "required": false,
+          "description": "time, distance, or fuel"
+        }
+      ],
+      "output": {
+        "type": "object",
+        "description": "Result"
+      },
+      "source": {
+        "type": "mcp_bridge",
+        "connection_id": "fleet-mcp",
+        "mcp_tool": "route.optimize"
+      },
+      "policy": {
+        "allowed": "always"
+      },
+      "mock": {
+        "enabled": true,
+        "mode": "examples",
+        "examples": [
+          {
+            "id": "tool-route-optimize-auto",
+            "input": {
+              "vehicle_id": "id-001",
+              "destination": "example"
+            },
+            "output": {
+              "success": true,
+              "data": {}
+            },
+            "description": "Auto-generated example for fleet.route.optimize"
+          }
+        ]
+      },
+      "security": {
+        "classification": "public"
+      }
+    },
+    {
+      "id": "tool-route-suggest-2",
+      "id_status": "permanent",
+      "name": "fleet.route.suggest",
+      "description": "Suggest route alternatives.",
+      "inputs": [
+        {
+          "name": "origin",
+          "type": "string",
+          "required": true,
+          "description": "Start"
+        },
+        {
+          "name": "destination",
+          "type": "string",
+          "required": true,
+          "description": "End"
+        }
+      ],
+      "output": {
+        "type": "object",
+        "description": "Result"
+      },
+      "source": {
+        "type": "mcp_bridge",
+        "connection_id": "fleet-mcp",
+        "mcp_tool": "route.suggest"
+      },
+      "policy": {
+        "allowed": "always"
+      },
+      "mock": {
+        "enabled": true,
+        "mode": "examples",
+        "examples": [
+          {
+            "id": "tool-route-suggest-auto",
+            "input": {
+              "origin": "example",
+              "destination": "example"
+            },
+            "output": {
+              "success": true,
+              "data": {}
+            },
+            "description": "Auto-generated example for fleet.route.suggest"
+          }
+        ]
+      },
+      "security": {
+        "classification": "public"
+      }
+    }
+  ],
+  "meta_tools": [],
+  "triggers": [],
+  "connectors": [
+    "fleet-mcp"
+  ],
+  "policy": {
+    "guardrails": {
+      "never": [],
+      "always": []
+    },
+    "approvals": [],
+    "workflows": [
+      {
+        "name": "Optimize route for a vehicle",
+        "description": "Auto-generated workflow for optimize_route",
+        "trigger": "optimize_route",
+        "steps": [
+          "fleet.route.optimize"
+        ],
+        "required": false,
+        "on_deviation": "warn",
+        "id": "optimize_route_for_a_vehicle_e996afab",
+        "steps_resolved": [
+          true
+        ]
+      },
+      {
+        "name": "Get route suggestions",
+        "description": "Auto-generated workflow for suggest_routes",
+        "trigger": "suggest_routes",
+        "steps": [],
+        "required": false,
+        "on_deviation": "warn",
+        "id": "get_route_suggestions_acc936cb",
+        "steps_resolved": []
+      }
+    ],
+    "escalation": {
+      "enabled": false,
+      "conditions": [],
+      "target": ""
+    }
+  },
+  "channels": [],
+  "id": "route-optimizer",
+  "name": "Route Optimizer",
+  "access_policy": {
+    "rules": [
+      {
+        "tools": [
+          "*"
+        ],
+        "effect": "allow"
+      }
+    ]
+  },
+  "created_at": "2026-03-01T11:59:17.216Z",
+  "updated_at": "2026-03-13T16:24:58.420Z",
+  "ui_capable": false,
+  "grant_mappings": [],
+  "response_filters": []
+}

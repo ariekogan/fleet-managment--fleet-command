@@ -1,0 +1,309 @@
+{
+  "description": "Driver safety monitoring and scoring.",
+  "version": "1.0.0",
+  "phase": "DEPLOYED",
+  "problem": {
+    "statement": "Fleet managers need real-time safety monitoring.",
+    "context": "Fleet managers need real-time safety monitoring.",
+    "goals": [
+      "Monitor driving behavior",
+      "Calculate safety scores"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "check_safety",
+      "title": "Check safety alerts",
+      "description": "Test scenario for check safety",
+      "steps": [
+        "User says: \"Any safety alerts?\"",
+        "Agent presents results to the user"
+      ],
+      "expected_outcome": "User request for check safety is handled successfully."
+    },
+    {
+      "id": "driver_score",
+      "title": "Get driver safety score",
+      "description": "Test scenario for driver score",
+      "steps": [
+        "User says: \"Safety score for Yossi Cohen\"",
+        "Agent presents results to the user"
+      ],
+      "expected_outcome": "User request for driver score is handled successfully."
+    }
+  ],
+  "role": {
+    "name": "Safety Monitoring Analyst",
+    "persona": "You monitor driving behavior and flag dangerous patterns. Escalate SOS alerts immediately.",
+    "goals": [
+      "Monitor safety alerts",
+      "Calculate driver safety scores"
+    ],
+    "limitations": [
+      "Cannot dismiss critical alerts"
+    ],
+    "communication_style": {
+      "tone": "technical",
+      "verbosity": "concise"
+    }
+  },
+  "glossary": {},
+  "intents": {
+    "supported": [
+      {
+        "id": "check_safety",
+        "description": "Check safety alerts",
+        "examples": [
+          "Any safety alerts?",
+          "Show critical alerts"
+        ],
+        "maps_to_workflow_resolved": true
+      },
+      {
+        "id": "driver_score",
+        "description": "Get driver safety score",
+        "examples": [
+          "Safety score for Yossi Cohen",
+          "How is VH-007 driver doing?"
+        ],
+        "maps_to_workflow_resolved": true
+      }
+    ],
+    "thresholds": {
+      "accept": 0.8,
+      "clarify": 0.5,
+      "reject": 0.3
+    },
+    "out_of_domain": {
+      "action": "redirect",
+      "message": ""
+    }
+  },
+  "engine": {
+    "rv2": {
+      "max_iterations": 16,
+      "iteration_timeout_ms": 30000,
+      "allow_parallel_tools": false,
+      "on_max_iterations": "ask_user"
+    },
+    "hlr": {
+      "enabled": true,
+      "critic": {
+        "enabled": true,
+        "check_interval": 3,
+        "strictness": "medium"
+      },
+      "reflection": {
+        "enabled": true,
+        "depth": "shallow"
+      },
+      "replanning": {
+        "enabled": true,
+        "max_replans": 5
+      }
+    },
+    "autonomy": {
+      "level": "autonomous"
+    },
+    "finalization_gate": {
+      "enabled": true,
+      "max_retries": 2
+    },
+    "internal_error": {
+      "enabled": true,
+      "tool_not_found": {
+        "enter_resolution_after": 1,
+        "retryable": false
+      },
+      "resolution": {
+        "max_iterations": 1,
+        "allowed_capabilities": [
+          "read",
+          "search",
+          "document_output"
+        ]
+      },
+      "loop_detection": {
+        "enabled": true,
+        "identical_call_threshold": 2
+      }
+    },
+    "model": "claude-sonnet-4-20250514",
+    "temperature": 0.1
+  },
+  "toolbox_imports": [],
+  "tools": [
+    {
+      "id": "tool-safety-alerts",
+      "id_status": "permanent",
+      "name": "fleet.safety.alerts",
+      "description": "Get recent safety alerts.",
+      "inputs": [
+        {
+          "name": "vehicle_id",
+          "type": "string",
+          "required": false,
+          "description": "Filter by vehicle"
+        },
+        {
+          "name": "severity",
+          "type": "string",
+          "required": false,
+          "description": "Filter: low, medium, high, critical"
+        },
+        {
+          "name": "limit",
+          "type": "number",
+          "required": false,
+          "description": "Max results"
+        }
+      ],
+      "output": {
+        "type": "object",
+        "description": "Result"
+      },
+      "source": {
+        "type": "mcp_bridge",
+        "connection_id": "fleet-mcp",
+        "mcp_tool": "safety.alerts"
+      },
+      "policy": {
+        "allowed": "always"
+      },
+      "mock": {
+        "enabled": true,
+        "mode": "examples",
+        "examples": [
+          {
+            "id": "tool-safety-alerts-auto",
+            "input": {},
+            "output": {
+              "success": true,
+              "data": {}
+            },
+            "description": "Auto-generated example for fleet.safety.alerts"
+          }
+        ]
+      },
+      "security": {
+        "classification": "public"
+      }
+    },
+    {
+      "id": "tool-safety-score",
+      "id_status": "permanent",
+      "name": "fleet.safety.score",
+      "description": "Calculate driver safety score.",
+      "inputs": [
+        {
+          "name": "driver_name",
+          "type": "string",
+          "required": false,
+          "description": "Driver name"
+        },
+        {
+          "name": "vehicle_id",
+          "type": "string",
+          "required": false,
+          "description": "Or filter by vehicle"
+        },
+        {
+          "name": "period_days",
+          "type": "number",
+          "required": false,
+          "description": "Scoring period (default: 30)"
+        }
+      ],
+      "output": {
+        "type": "object",
+        "description": "Result"
+      },
+      "source": {
+        "type": "mcp_bridge",
+        "connection_id": "fleet-mcp",
+        "mcp_tool": "safety.score"
+      },
+      "policy": {
+        "allowed": "always"
+      },
+      "mock": {
+        "enabled": true,
+        "mode": "examples",
+        "examples": [
+          {
+            "id": "tool-safety-score-auto",
+            "input": {},
+            "output": {
+              "success": true,
+              "data": {}
+            },
+            "description": "Auto-generated example for fleet.safety.score"
+          }
+        ]
+      },
+      "security": {
+        "classification": "public"
+      }
+    }
+  ],
+  "meta_tools": [],
+  "triggers": [],
+  "connectors": [
+    "fleet-mcp"
+  ],
+  "policy": {
+    "guardrails": {
+      "never": [],
+      "always": []
+    },
+    "approvals": [],
+    "workflows": [
+      {
+        "name": "Check safety alerts",
+        "description": "Auto-generated workflow for check_safety",
+        "trigger": "check_safety",
+        "steps": [],
+        "required": false,
+        "on_deviation": "warn",
+        "id": "check_safety_alerts_c4a3d48c",
+        "steps_resolved": []
+      },
+      {
+        "name": "Get driver safety score",
+        "description": "Auto-generated workflow for driver_score",
+        "trigger": "driver_score",
+        "steps": [],
+        "required": false,
+        "on_deviation": "warn",
+        "id": "get_driver_safety_score_1dba56e4",
+        "steps_resolved": []
+      }
+    ],
+    "escalation": {
+      "enabled": true,
+      "conditions": [
+        "SOS alerts",
+        "Critical safety events"
+      ],
+      "target": ""
+    }
+  },
+  "channels": [],
+  "id": "safety-monitor",
+  "name": "Safety Monitor",
+  "access_policy": {
+    "rules": [
+      {
+        "tools": [
+          "*"
+        ],
+        "effect": "allow"
+      }
+    ]
+  },
+  "created_at": "2026-03-01T11:59:17.306Z",
+  "updated_at": "2026-03-13T16:25:05.202Z",
+  "ui_capable": false,
+  "grant_mappings": [],
+  "response_filters": []
+}
