@@ -5,7 +5,7 @@
   "version": "2.0.0",
   "phase": "DEPLOYED",
   "problem": {
-    "statement": "Fleet managers need a single entry point for all fleet operations — vehicle tracking, route optimization, and safety monitoring.",
+    "statement": "Fleet managers need real-time visibility into vehicle locations, driver assignments, and fleet status. They ask about specific vehicles or drivers by name and expect instant answers from real fleet data.",
     "context": "Commercial fleet with 15+ vehicles in the Tel Aviv metropolitan area. This skill is the orchestrator that handles vehicle queries directly and delegates route/safety requests to worker skills.",
     "goals": [
       "Provide real-time vehicle positions and status",
@@ -131,7 +131,7 @@
       "level": "autonomous"
     },
     "finalization_gate": {
-      "enabled": true,
+      "enabled": false,
       "max_retries": 3
     },
     "internal_error": {
@@ -154,7 +154,11 @@
       }
     },
     "model": "claude-sonnet-4-20250514",
-    "temperature": 0.2
+    "temperature": 0.2,
+    "bootstrap_tools": [
+      "fleet.vehicles.list",
+      "fleet.vehicle.get"
+    ]
   },
   "tools": [
     {
