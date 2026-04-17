@@ -3,6 +3,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Fleet Dashboard</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: #0f1419; color: #e7e9ea; padding: 10px; font-size: 13px; height: 100vh; overflow: hidden; }
@@ -11,43 +13,58 @@
   .header h1 { font-size: 15px; font-weight: 700; }
   .live-badge { font-size: 10px; color: #00ba7c; display: none; align-items: center; gap: 4px; }
   .live-badge::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: #00ba7c; display: inline-block; animation: pulse 2s infinite; }
-  @keyframes pulse { 0%,100%{opacity:1}50%{opacity:.3} }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
 
   .metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 8px; }
-  .mc { background: #1a1f26; border-radius: 6px; padding: 8px; border: 1px solid #2f3640; text-align: center; }
-  .mc-label { font-size: 9px; color: #71767b; text-transform: uppercase; letter-spacing: .5px; }
-  .mc-val { font-size: 20px; font-weight: 700; }
-  .mc-val.grn { color: #00ba7c; } .mc-val.blu { color: #1d9bf0; } .mc-val.ylw { color: #ffd700; } .mc-val.red { color: #f4212e; }
+  .metric-card { background: #1a1f26; border-radius: 6px; padding: 8px; border: 1px solid #2f3640; text-align: center; }
+  .metric-label { font-size: 9px; color: #71767b; text-transform: uppercase; letter-spacing: 0.5px; }
+  .metric-value { font-size: 20px; font-weight: 700; }
+  .metric-value.green { color: #00ba7c; }
+  .metric-value.blue { color: #1d9bf0; }
+  .metric-value.yellow { color: #ffd700; }
+  .metric-value.red { color: #f4212e; }
 
-  .main { display: grid; grid-template-columns: 1fr 220px; gap: 8px; height: calc(100vh - 108px); }
-  @media (max-width: 600px) { .main { grid-template-columns: 1fr; height: auto; } .metrics { grid-template-columns: repeat(2,1fr); } }
+  .main-layout { display: grid; grid-template-columns: 1fr 240px; gap: 8px; height: calc(100vh - 110px); }
+  @media (max-width: 600px) { .main-layout { grid-template-columns: 1fr; height: auto; } .metrics { grid-template-columns: repeat(2, 1fr); } }
 
-  .map-wrap { background: #1a1f26; border-radius: 8px; border: 1px solid #2f3640; position: relative; overflow: hidden; }
-  #mapCanvas { width: 100%; height: 100%; cursor: grab; }
-  .map-label { position: absolute; bottom: 6px; left: 8px; font-size: 9px; color: #555; pointer-events: none; }
+  #map { border-radius: 8px; border: 1px solid #2f3640; min-height: 300px; }
+  .leaflet-container { background: #1a1f26; }
 
-  .sidebar { display: flex; flex-direction: column; gap: 6px; overflow: hidden; }
+  .sidebar { display: flex; flex-direction: column; gap: 8px; overflow: hidden; }
   .panel { background: #1a1f26; border-radius: 8px; border: 1px solid #2f3640; overflow: hidden; flex: 1; display: flex; flex-direction: column; }
-  .ph { font-size: 11px; font-weight: 600; padding: 6px 10px; background: #22272e; border-bottom: 1px solid #2f3640; flex-shrink: 0; }
-  .pb { overflow-y: auto; flex: 1; }
+  .panel-header { font-size: 11px; font-weight: 600; padding: 6px 10px; background: #22272e; border-bottom: 1px solid #2f3640; flex-shrink: 0; }
+  .panel-body { overflow-y: auto; flex: 1; }
 
-  .vi { display: flex; align-items: center; gap: 5px; padding: 4px 8px; border-bottom: 1px solid #1e2730; cursor: pointer; font-size: 11px; }
-  .vi:hover { background: #22272e; }
-  .vi.act { background: #1d3a5c; }
-  .vd { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
-  .vd.moving { background: #00ba7c; } .vd.idle { background: #71767b; } .vd.alert { background: #f4212e; animation: pulse 1.5s infinite; }
-  .vid { font-weight: 600; width: 44px; font-size: 10px; }
-  .vdr { flex: 1; color: #999; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; }
-  .vsp { width: 38px; text-align: right; font-size: 9px; color: #71767b; }
+  .v-item { display: flex; align-items: center; gap: 6px; padding: 5px 10px; border-bottom: 1px solid #1e2730; cursor: pointer; font-size: 11px; }
+  .v-item:hover { background: #22272e; }
+  .v-item.active { background: #1d3a5c; }
+  .v-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .v-dot.moving { background: #00ba7c; }
+  .v-dot.idle { background: #71767b; }
+  .v-dot.alert { background: #f4212e; animation: pulse 1.5s infinite; }
+  .v-id { font-weight: 600; width: 46px; }
+  .v-driver { flex: 1; color: #aaa; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .v-speed { width: 42px; text-align: right; font-size: 10px; color: #71767b; }
 
-  .ai { padding: 5px 8px; border-bottom: 1px solid #1e2730; cursor: pointer; }
-  .ai:hover { background: #22272e; }
-  .ai:last-child { border-bottom: none; }
-  .at { display: flex; align-items: center; gap: 5px; }
-  .adot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
-  .adot.critical { background: #f4212e; } .adot.high { background: #ff6b00; } .adot.medium { background: #ffd700; } .adot.low { background: #71767b; }
-  .atxt { font-size: 10px; }
-  .am { font-size: 9px; color: #71767b; margin-top: 1px; margin-left: 10px; }
+  .alert-item { padding: 6px 10px; border-bottom: 1px solid #1e2730; }
+  .alert-item:last-child { border-bottom: none; }
+  .alert-top { display: flex; align-items: center; gap: 6px; }
+  .alert-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+  .alert-dot.critical { background: #f4212e; }
+  .alert-dot.high { background: #ff6b00; }
+  .alert-dot.medium { background: #ffd700; }
+  .alert-dot.low { background: #71767b; }
+  .alert-text { font-size: 11px; }
+  .alert-meta { font-size: 9px; color: #71767b; margin-top: 1px; margin-left: 12px; }
+
+  .leaflet-popup-content-wrapper { background: #1a1f26; color: #e7e9ea; border-radius: 8px; border: 1px solid #2f3640; }
+  .leaflet-popup-tip { background: #1a1f26; }
+  .leaflet-popup-content { margin: 8px 12px; font-size: 12px; line-height: 1.5; }
+  .popup-id { font-weight: 700; font-size: 13px; }
+  .popup-status { display: inline-block; padding: 1px 6px; border-radius: 10px; font-size: 10px; font-weight: 600; }
+  .popup-status.moving { background: rgba(0,186,124,0.2); color: #00ba7c; }
+  .popup-status.idle { background: rgba(113,118,123,0.2); color: #71767b; }
+  .popup-status.alert { background: rgba(244,33,46,0.2); color: #f4212e; }
 </style>
 </head><body>
 
@@ -57,303 +74,246 @@
 </div>
 
 <div class="metrics">
-  <div class="mc"><div class="mc-label">Total</div><div class="mc-val blu" id="mT">15</div></div>
-  <div class="mc"><div class="mc-label">Moving</div><div class="mc-val grn" id="mM">8</div></div>
-  <div class="mc"><div class="mc-label">Idle</div><div class="mc-val ylw" id="mI">5</div></div>
-  <div class="mc"><div class="mc-label">Alerts</div><div class="mc-val red" id="mA">2</div></div>
+  <div class="metric-card"><div class="metric-label">Total</div><div class="metric-value blue" id="mTotal">15</div></div>
+  <div class="metric-card"><div class="metric-label">Moving</div><div class="metric-value green" id="mMoving">8</div></div>
+  <div class="metric-card"><div class="metric-label">Idle</div><div class="metric-value yellow" id="mIdle">5</div></div>
+  <div class="metric-card"><div class="metric-label">Alerts</div><div class="metric-value red" id="mAlerts">2</div></div>
 </div>
 
-<div class="main">
-  <div class="map-wrap">
-    <canvas id="mapCanvas"></canvas>
-    <div class="map-label">Tel Aviv Metro</div>
-  </div>
+<div class="main-layout">
+  <div id="map"></div>
   <div class="sidebar">
     <div class="panel">
-      <div class="ph">Vehicles</div>
-      <div class="pb" id="vList"></div>
+      <div class="panel-header">Vehicles</div>
+      <div class="panel-body" id="vehicleList"></div>
     </div>
-    <div class="panel" style="max-height:38%;">
-      <div class="ph">Alerts</div>
-      <div class="pb" id="aList"></div>
+    <div class="panel" style="max-height: 40%;">
+      <div class="panel-header">Alerts</div>
+      <div class="panel-body" id="alertsList"></div>
     </div>
   </div>
 </div>
 
 <script>
-var V = [
-  { vehicle_id:'VH-001', driver:'Yossi Cohen', type:'truck', status:'moving', position:{lng:34.7918,lat:32.0853}, speed:85, fuel:72 },
-  { vehicle_id:'VH-002', driver:'David Levy', type:'van', status:'idle', position:{lng:34.7650,lat:32.0950}, speed:0, fuel:45 },
-  { vehicle_id:'VH-003', driver:'Sarah Mizrahi', type:'truck', status:'moving', position:{lng:34.7890,lat:32.0700}, speed:65, fuel:88 },
-  { vehicle_id:'VH-004', driver:'Avi Ben-David', type:'car', status:'moving', position:{lng:34.8200,lat:32.0850}, speed:50, fuel:60 },
-  { vehicle_id:'VH-005', driver:'Rachel Goldstein', type:'motorcycle', status:'idle', position:{lng:34.7800,lat:32.0853}, speed:0, fuel:90 },
-  { vehicle_id:'VH-006', driver:'Moshe Peretz', type:'truck', status:'alert', position:{lng:34.7680,lat:32.0880}, speed:0, fuel:12 },
-  { vehicle_id:'VH-007', driver:'Tamar Shapira', type:'van', status:'moving', position:{lng:34.8100,lat:32.0830}, speed:125, fuel:55 },
-  { vehicle_id:'VH-008', driver:'Eli Dahan', type:'car', status:'idle', position:{lng:34.7900,lat:32.0790}, speed:0, fuel:78 },
-  { vehicle_id:'VH-009', driver:'Noa Friedman', type:'motorcycle', status:'moving', position:{lng:34.7850,lat:32.0900}, speed:40, fuel:65 },
-  { vehicle_id:'VH-010', driver:'Oren Avraham', type:'truck', status:'idle', position:{lng:34.7800,lat:32.0770}, speed:0, fuel:34 },
-  { vehicle_id:'VH-011', driver:'Michal Katz', type:'van', status:'moving', position:{lng:34.7700,lat:32.0750}, speed:72, fuel:50 },
-  { vehicle_id:'VH-012', driver:'Amit Rosen', type:'car', status:'alert', position:{lng:34.7950,lat:32.1000}, speed:0, fuel:8 },
-  { vehicle_id:'VH-013', driver:'Yael Schwartz', type:'motorcycle', status:'moving', position:{lng:34.8000,lat:32.1050}, speed:55, fuel:82 },
-  { vehicle_id:'VH-014', driver:'Dan Agmon', type:'truck', status:'idle', position:{lng:34.8050,lat:32.1080}, speed:0, fuel:42 },
-  { vehicle_id:'VH-015', driver:'Liat Baruch', type:'van', status:'moving', position:{lng:34.7875,lat:32.0620}, speed:90, fuel:67 }
+// ── EMBEDDED DEFAULTS — renders immediately, works on mobile ──
+var VEHICLES = [
+  { vehicle_id: 'VH-001', plate: '312-YK', driver: 'Yossi Cohen', type: 'truck', status: 'moving', position: { lng: 34.7918, lat: 32.0853 }, speed: 85, fuel: 72 },
+  { vehicle_id: 'VH-002', plate: '448-BT', driver: 'David Levy', type: 'van', status: 'idle', position: { lng: 34.7650, lat: 32.0950 }, speed: 0, fuel: 45 },
+  { vehicle_id: 'VH-003', plate: '485-AB', driver: 'Sarah Mizrahi', type: 'truck', status: 'moving', position: { lng: 34.7890, lat: 32.0700 }, speed: 65, fuel: 88 },
+  { vehicle_id: 'VH-004', plate: '629-DM', driver: 'Avi Ben-David', type: 'car', status: 'moving', position: { lng: 34.8200, lat: 32.0850 }, speed: 50, fuel: 60 },
+  { vehicle_id: 'VH-005', plate: '773-RF', driver: 'Rachel Goldstein', type: 'motorcycle', status: 'idle', position: { lng: 34.7800, lat: 32.0853 }, speed: 0, fuel: 90 },
+  { vehicle_id: 'VH-006', plate: '195-GH', driver: 'Moshe Peretz', type: 'truck', status: 'alert', position: { lng: 34.7680, lat: 32.0880 }, speed: 0, fuel: 12 },
+  { vehicle_id: 'VH-007', plate: '841-NP', driver: 'Tamar Shapira', type: 'van', status: 'moving', position: { lng: 34.8100, lat: 32.0830 }, speed: 125, fuel: 55 },
+  { vehicle_id: 'VH-008', plate: '356-WQ', driver: 'Eli Dahan', type: 'car', status: 'idle', position: { lng: 34.7900, lat: 32.0790 }, speed: 0, fuel: 78 },
+  { vehicle_id: 'VH-009', plate: '502-JL', driver: 'Noa Friedman', type: 'motorcycle', status: 'moving', position: { lng: 34.7850, lat: 32.0900 }, speed: 40, fuel: 65 },
+  { vehicle_id: 'VH-010', plate: '667-CT', driver: 'Oren Avraham', type: 'truck', status: 'idle', position: { lng: 34.7800, lat: 32.0770 }, speed: 0, fuel: 34 },
+  { vehicle_id: 'VH-011', plate: '914-EX', driver: 'Michal Katz', type: 'van', status: 'moving', position: { lng: 34.7700, lat: 32.0750 }, speed: 72, fuel: 50 },
+  { vehicle_id: 'VH-012', plate: '238-SV', driver: 'Amit Rosen', type: 'car', status: 'alert', position: { lng: 34.7950, lat: 32.1000 }, speed: 0, fuel: 8 },
+  { vehicle_id: 'VH-013', plate: '581-KZ', driver: 'Yael Schwartz', type: 'motorcycle', status: 'moving', position: { lng: 34.8000, lat: 32.1050 }, speed: 55, fuel: 82 },
+  { vehicle_id: 'VH-014', plate: '726-MR', driver: 'Dan Agmon', type: 'truck', status: 'idle', position: { lng: 34.8050, lat: 32.1080 }, speed: 0, fuel: 42 },
+  { vehicle_id: 'VH-015', plate: '149-UP', driver: 'Liat Baruch', type: 'van', status: 'moving', position: { lng: 34.7875, lat: 32.0620 }, speed: 90, fuel: 67 }
 ];
 
-var AL = [
-  { type:'sos', severity:'critical', vehicle_id:'VH-006', driver:'Moshe Peretz', message:'Driver pressed SOS button' },
-  { type:'speeding', severity:'high', vehicle_id:'VH-007', driver:'Tamar Shapira', speed:125, limit:90 },
-  { type:'geofence_exit', severity:'high', vehicle_id:'VH-012', driver:'Amit Rosen', geofence:'Tel Aviv Depot' },
-  { type:'speeding', severity:'medium', vehicle_id:'VH-015', driver:'Liat Baruch', speed:105, limit:90 },
-  { type:'harsh_brake', severity:'medium', vehicle_id:'VH-003', driver:'Sarah Mizrahi' },
-  { type:'low_fuel', severity:'low', vehicle_id:'VH-006', driver:'Moshe Peretz', fuel_level:12 }
+var ALERTS = [
+  { type: 'sos', severity: 'critical', vehicle_id: 'VH-006', driver: 'Moshe Peretz', message: 'Driver pressed SOS button' },
+  { type: 'speeding', severity: 'high', vehicle_id: 'VH-007', driver: 'Tamar Shapira', speed: 125, limit: 90 },
+  { type: 'geofence_exit', severity: 'high', vehicle_id: 'VH-012', driver: 'Amit Rosen', geofence: 'Tel Aviv Depot' },
+  { type: 'speeding', severity: 'medium', vehicle_id: 'VH-015', driver: 'Liat Baruch', speed: 105, limit: 90 },
+  { type: 'harsh_brake', severity: 'medium', vehicle_id: 'VH-003', driver: 'Sarah Mizrahi' },
+  { type: 'low_fuel', severity: 'low', vehicle_id: 'VH-006', driver: 'Moshe Peretz', fuel_level: 12 }
 ];
 
-var GF = [
-  { name:'Tel Aviv Depot', center:[32.0853,34.7818], radius:500 },
-  { name:'Herzliya Industrial', center:[32.1080,34.8050], radius:800 },
-  { name:'Rishon Restricted', center:[32.0460,34.7850], radius:600 },
-  { name:'Ramat Gan Hub', center:[32.0830,34.8100], radius:400 }
+var GEOFENCES = [
+  { id: 'GF-001', name: 'Tel Aviv Depot', center: [32.0853, 34.7818], radius: 500 },
+  { id: 'GF-002', name: 'Herzliya Industrial', center: [32.1080, 34.8050], radius: 800 },
+  { id: 'GF-003', name: 'Rishon Restricted', center: [32.0460, 34.7850], radius: 600 },
+  { id: 'GF-004', name: 'Ramat Gan Hub', center: [32.0830, 34.8100], radius: 400 }
 ];
 
-var selId = null;
-var SC = { moving:'#00ba7c', idle:'#71767b', alert:'#f4212e' };
-var TI = { truck:'T', van:'V', car:'C', motorcycle:'M' };
+// ── MAP ──
+var map = L.map('map', { zoomControl: false }).setView([32.08, 34.79], 13);
+L.control.zoom({ position: 'topright' }).addTo(map);
 
-// ── CANVAS MAP — zero external deps ──
-var canvas = document.getElementById('mapCanvas');
-var ctx = canvas.getContext('2d');
-var mapBounds = { minLat: 32.040, maxLat: 32.115, minLng: 34.745, maxLng: 34.835 };
-var dpr = window.devicePixelRatio || 1;
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+  attribution: '',
+  subdomains: 'abcd',
+  maxZoom: 19
+}).addTo(map);
 
-function resizeCanvas() {
-  var r = canvas.parentElement.getBoundingClientRect();
-  canvas.width = r.width * dpr;
-  canvas.height = r.height * dpr;
-  canvas.style.width = r.width + 'px';
-  canvas.style.height = r.height + 'px';
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  drawMap();
+var statusColors = { moving: '#00ba7c', idle: '#71767b', alert: '#f4212e' };
+var typeIcons = { truck: 'T', van: 'V', car: 'C', motorcycle: 'M' };
+var markers = {};
+var selectedId = null;
+
+function makeIcon(v) {
+  var color = statusColors[v.status] || '#71767b';
+  var letter = typeIcons[v.type] || '?';
+  var selected = v.vehicle_id === selectedId;
+  var size = selected ? 28 : 22;
+  var border = selected ? '3px solid #fff' : '2px solid ' + color;
+  return L.divIcon({
+    className: '',
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
+    html: '<div style="width:' + size + 'px;height:' + size + 'px;border-radius:50%;background:' + color + ';border:' + border + ';display:flex;align-items:center;justify-content:center;font-size:' + (selected ? 12 : 10) + 'px;font-weight:700;color:#fff;box-shadow:0 2px 6px rgba(0,0,0,0.4);">' + letter + '</div>'
+  });
 }
 
-function lngToX(lng) { return ((lng - mapBounds.minLng) / (mapBounds.maxLng - mapBounds.minLng)) * (canvas.width / dpr); }
-function latToY(lat) { return ((mapBounds.maxLat - lat) / (mapBounds.maxLat - mapBounds.minLat)) * (canvas.height / dpr); }
-
-function drawMap() {
-  var w = canvas.width / dpr, h = canvas.height / dpr;
-  // Background
-  ctx.fillStyle = '#151b23';
-  ctx.fillRect(0, 0, w, h);
-
-  // Grid
-  ctx.strokeStyle = '#1e2730';
-  ctx.lineWidth = 0.5;
-  for (var glat = 32.04; glat <= 32.12; glat += 0.01) {
-    var y = latToY(glat);
-    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
-  }
-  for (var glng = 34.75; glng <= 34.84; glng += 0.01) {
-    var x = lngToX(glng);
-    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
-  }
-
-  // Roads (simplified Tel Aviv grid)
-  ctx.strokeStyle = '#252d38';
-  ctx.lineWidth = 2;
-  // Ayalon Highway (north-south)
-  ctx.beginPath();
-  ctx.moveTo(lngToX(34.7870), latToY(32.115));
-  ctx.lineTo(lngToX(34.7870), latToY(32.040));
-  ctx.stroke();
-  // Road 2 - coastal
-  ctx.beginPath();
-  ctx.moveTo(lngToX(34.7650), latToY(32.115));
-  ctx.lineTo(lngToX(34.7650), latToY(32.040));
-  ctx.stroke();
-  // Road 4 - Geha
-  ctx.beginPath();
-  ctx.moveTo(lngToX(34.8100), latToY(32.115));
-  ctx.lineTo(lngToX(34.8100), latToY(32.040));
-  ctx.stroke();
-  // East-west roads
-  ctx.beginPath();
-  ctx.moveTo(lngToX(34.745), latToY(32.085));
-  ctx.lineTo(lngToX(34.835), latToY(32.085));
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(lngToX(34.745), latToY(32.070));
-  ctx.lineTo(lngToX(34.835), latToY(32.070));
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(lngToX(34.745), latToY(32.100));
-  ctx.lineTo(lngToX(34.835), latToY(32.100));
-  ctx.stroke();
-
+function renderMap() {
   // Geofences
-  for (var g = 0; g < GF.length; g++) {
-    var gf = GF[g];
-    var gx = lngToX(gf.center[1]);
-    var gy = latToY(gf.center[0]);
-    var pixelRadius = (gf.radius / 111320) / (mapBounds.maxLng - mapBounds.minLng) * w * Math.cos(gf.center[0] * Math.PI / 180);
-    ctx.beginPath();
-    ctx.arc(gx, gy, pixelRadius, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(29,155,240,0.06)';
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(29,155,240,0.3)';
-    ctx.lineWidth = 1;
-    ctx.stroke();
-    ctx.fillStyle = '#3a5070';
-    ctx.font = '9px system-ui';
-    ctx.textAlign = 'center';
-    ctx.fillText(gf.name, gx, gy - pixelRadius - 4);
+  for (var g = 0; g < GEOFENCES.length; g++) {
+    var gf = GEOFENCES[g];
+    L.circle(gf.center, { radius: gf.radius, color: '#1d9bf0', weight: 1, opacity: 0.4, fillColor: '#1d9bf0', fillOpacity: 0.06 }).addTo(map)
+      .bindTooltip(gf.name, { permanent: false, className: 'geo-tip' });
   }
-
-  // Vehicle markers
-  for (var i = 0; i < V.length; i++) {
-    var v = V[i];
-    var vx = lngToX(v.position.lng);
-    var vy = latToY(v.position.lat);
-    var color = SC[v.status] || '#71767b';
-    var isSel = v.vehicle_id === selId;
-    var r = isSel ? 14 : 10;
-
-    // Glow for selected
-    if (isSel) {
-      ctx.beginPath();
-      ctx.arc(vx, vy, 22, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(29,155,240,0.15)';
-      ctx.fill();
-    }
-
-    // Alert pulse ring
-    if (v.status === 'alert') {
-      ctx.beginPath();
-      ctx.arc(vx, vy, 16, 0, Math.PI * 2);
-      ctx.strokeStyle = 'rgba(244,33,46,0.3)';
-      ctx.lineWidth = 2;
-      ctx.stroke();
-    }
-
-    // Marker circle
-    ctx.beginPath();
-    ctx.arc(vx, vy, r, 0, Math.PI * 2);
-    ctx.fillStyle = color;
-    ctx.fill();
-    if (isSel) {
-      ctx.strokeStyle = '#fff';
-      ctx.lineWidth = 2;
-      ctx.stroke();
-    } else {
-      ctx.strokeStyle = 'rgba(0,0,0,0.3)';
-      ctx.lineWidth = 1;
-      ctx.stroke();
-    }
-
-    // Letter
-    ctx.fillStyle = '#fff';
-    ctx.font = (isSel ? 'bold 11px' : '9px') + ' system-ui';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(TI[v.type] || '?', vx, vy);
-
-    // ID label
-    if (isSel) {
-      ctx.fillStyle = '#e7e9ea';
-      ctx.font = 'bold 10px system-ui';
-      ctx.fillText(v.vehicle_id, vx, vy - r - 6);
-      ctx.font = '9px system-ui';
-      ctx.fillStyle = '#aaa';
-      ctx.fillText(v.driver, vx, vy + r + 10);
-    }
-
-    // Speed direction indicator for moving vehicles
-    if (v.speed > 0) {
-      ctx.beginPath();
-      ctx.arc(vx, vy, r + 3, 0, Math.PI * 2);
-      ctx.strokeStyle = 'rgba(255,255,255,0.1)';
-      ctx.lineWidth = 1;
-      ctx.stroke();
-    }
+  // Vehicles
+  for (var i = 0; i < VEHICLES.length; i++) {
+    var v = VEHICLES[i];
+    var m = L.marker([v.position.lat, v.position.lng], { icon: makeIcon(v) }).addTo(map);
+    m._vid = v.vehicle_id;
+    m.bindPopup(
+      '<div class="popup-id">' + v.vehicle_id + '</div>' +
+      '<span class="popup-status ' + v.status + '">' + v.status + '</span>' +
+      '<br>' + v.driver + ' (' + v.type + ')' +
+      '<br>Speed: ' + v.speed + ' km/h | Fuel: ' + v.fuel + '%'
+    );
+    m.on('click', function(e) { selectVehicle(e.target._vid); });
+    markers[v.vehicle_id] = m;
   }
 }
 
-// Click on canvas to select vehicle
-canvas.addEventListener('click', function(e) {
-  var rect = canvas.getBoundingClientRect();
-  var mx = e.clientX - rect.left;
-  var my = e.clientY - rect.top;
-  var closest = null, minDist = 20;
-  for (var i = 0; i < V.length; i++) {
-    var vx = lngToX(V[i].position.lng);
-    var vy = latToY(V[i].position.lat);
-    var d = Math.sqrt((mx-vx)*(mx-vx) + (my-vy)*(my-vy));
-    if (d < minDist) { minDist = d; closest = V[i].vehicle_id; }
+function selectVehicle(id) {
+  selectedId = id;
+  // Update markers
+  for (var vid in markers) {
+    var v = VEHICLES.find(function(x) { return x.vehicle_id === vid; });
+    if (v) markers[vid].setIcon(makeIcon(v));
   }
-  if (closest) sel(closest);
-});
-
-function sel(id) {
-  selId = id;
-  drawMap();
-  renderVList();
+  if (markers[id]) {
+    markers[id].openPopup();
+    map.panTo(markers[id].getLatLng(), { animate: true });
+  }
+  renderVehicleList();
 }
-
-window.addEventListener('resize', resizeCanvas);
-setTimeout(resizeCanvas, 50);
 
 // ── VEHICLE LIST ──
-function renderVList() {
-  var h = '';
-  for (var i = 0; i < V.length; i++) {
-    var v = V[i];
-    h += '<div class="vi' + (v.vehicle_id===selId?' act':'') + '" onclick="sel(\'' + v.vehicle_id + '\')">' +
-      '<div class="vd ' + v.status + '"></div>' +
-      '<div class="vid">' + v.vehicle_id + '</div>' +
-      '<div class="vdr">' + v.driver + '</div>' +
-      '<div class="vsp">' + (v.speed > 0 ? v.speed + '' : '--') + '</div></div>';
+function renderVehicleList() {
+  var html = '';
+  for (var i = 0; i < VEHICLES.length; i++) {
+    var v = VEHICLES[i];
+    var active = v.vehicle_id === selectedId ? ' active' : '';
+    html += '<div class="v-item' + active + '" onclick="selectVehicle(\'' + v.vehicle_id + '\')">' +
+      '<div class="v-dot ' + v.status + '"></div>' +
+      '<div class="v-id">' + v.vehicle_id + '</div>' +
+      '<div class="v-driver">' + v.driver + '</div>' +
+      '<div class="v-speed">' + (v.speed > 0 ? v.speed + ' km/h' : '--') + '</div>' +
+      '</div>';
   }
-  document.getElementById('vList').innerHTML = h;
+  document.getElementById('vehicleList').innerHTML = html;
 }
 
 // ── METRICS ──
-function renderM() {
-  var m=0,d=0,a=0;
-  for(var i=0;i<V.length;i++){if(V[i].status==='moving')m++;else if(V[i].status==='idle')d++;else if(V[i].status==='alert')a++;}
-  document.getElementById('mT').textContent=V.length;
-  document.getElementById('mM').textContent=m;
-  document.getElementById('mI').textContent=d;
-  document.getElementById('mA').textContent=a;
+function renderMetrics() {
+  var moving = 0, idle = 0, alert = 0;
+  for (var i = 0; i < VEHICLES.length; i++) {
+    if (VEHICLES[i].status === 'moving') moving++;
+    else if (VEHICLES[i].status === 'idle') idle++;
+    else if (VEHICLES[i].status === 'alert') alert++;
+  }
+  document.getElementById('mTotal').textContent = VEHICLES.length;
+  document.getElementById('mMoving').textContent = moving;
+  document.getElementById('mIdle').textContent = idle;
+  document.getElementById('mAlerts').textContent = alert;
 }
 
 // ── ALERTS ──
-function adesc(a){
-  if(a.type==='sos')return'SOS: '+(a.message||'Emergency');
-  if(a.type==='speeding')return'Speed: '+a.speed+' km/h (limit '+(a.limit||90)+')';
-  if(a.type==='geofence_exit')return'Geofence: '+(a.geofence||'zone');
-  if(a.type==='harsh_brake')return'Harsh braking';
-  if(a.type==='low_fuel')return'Low fuel: '+(a.fuel_level||'?')+'%';
+function alertDesc(a) {
+  if (a.type === 'sos') return 'SOS: ' + (a.message || 'Emergency');
+  if (a.type === 'speeding') return 'Speeding: ' + a.speed + ' km/h (limit ' + (a.limit || 90) + ')';
+  if (a.type === 'geofence_exit') return 'Geofence exit: ' + (a.geofence || 'zone');
+  if (a.type === 'harsh_brake') return 'Harsh braking';
+  if (a.type === 'low_fuel') return 'Low fuel: ' + (a.fuel_level || '?') + '%';
   return a.type;
 }
-function renderAL(){
-  var h='';
-  for(var i=0;i<AL.length;i++){var a=AL[i];
-    h+='<div class="ai" onclick="sel(\''+a.vehicle_id+'\')"><div class="at"><div class="adot '+a.severity+'"></div><div class="atxt">'+adesc(a)+'</div></div><div class="am">'+a.vehicle_id+' - '+a.driver+'</div></div>';
+
+function renderAlerts() {
+  var html = '';
+  for (var i = 0; i < ALERTS.length; i++) {
+    var a = ALERTS[i];
+    html += '<div class="alert-item" onclick="selectVehicle(\'' + a.vehicle_id + '\')" style="cursor:pointer">' +
+      '<div class="alert-top"><div class="alert-dot ' + a.severity + '"></div><div class="alert-text">' + alertDesc(a) + '</div></div>' +
+      '<div class="alert-meta">' + a.vehicle_id + ' - ' + a.driver + '</div></div>';
   }
-  document.getElementById('aList').innerHTML=h;
+  document.getElementById('alertsList').innerHTML = html;
 }
 
-renderM(); renderVList(); renderAL();
+// ── RENDER ALL ──
+renderMetrics();
+renderVehicleList();
+renderAlerts();
+renderMap();
 
 // ── POSTMESSAGE BRIDGE ──
-var hostReady=false, cnt=0, pnd={};
-window.addEventListener('message',function(ev){
-  var d=ev.data||{};if(d.source!=='adas-host')return;var msg=d.message;
-  if(msg&&msg.type==='init'){hostReady=true;tryLive();}
-  if(msg&&msg.type==='mcp-result'&&msg.payload){var p=pnd[msg.payload.requestId];if(p){delete pnd[msg.payload.requestId];msg.payload.error?p.reject(msg.payload.error):p.resolve(unwrap(msg.payload.result));}}
-  if(msg&&msg.type==='plugin-command'&&msg.payload){handleCmd(msg.payload);}
+var hostReady = false;
+var counter = 0;
+var pending = {};
+
+window.addEventListener('message', function(ev) {
+  var d = ev.data || {};
+  if (d.source === 'adas-host') {
+    var msg = d.message;
+    if (msg && msg.type === 'init') { hostReady = true; tryLiveData(); }
+    if (msg && msg.type === 'mcp-result' && msg.payload) {
+      var p = pending[msg.payload.requestId];
+      if (p) { delete pending[msg.payload.requestId]; msg.payload.error ? p.reject(msg.payload.error) : p.resolve(unwrap(msg.payload.result)); }
+    }
+    if (msg && msg.type === 'plugin-command' && msg.payload) { handleCommand(msg.payload); }
+  }
 });
-function unwrap(r){if(r&&r.content&&r.content[0]&&r.content[0].type==='text')try{r=JSON.parse(r.content[0].text)}catch(e){}if(r&&r.content&&r.content[0]&&r.content[0].type==='text')try{r=JSON.parse(r.content[0].text)}catch(e){}return r;}
-function mcpCall(tool,args){var rid='req_'+(++cnt)+'_'+Date.now();return new Promise(function(res,rej){var t=setTimeout(function(){delete pnd[rid];rej(new Error('timeout'))},10000);pnd[rid]={resolve:function(r){clearTimeout(t);res(r)},reject:function(e){clearTimeout(t);rej(e)}};window.parent.postMessage({source:'adas-plugin',message:{action:'mcp-call',payload:{requestId:rid,toolName:'cp.fe_api',args:{method:'mcpProxy',params:{connectorId:'fleet-mcp',tool:tool,args:args||{}}}}}},'*');});}
-function handleCmd(p){if(p.command==='focus_vehicle'&&p.args&&p.args.vehicle_id)sel(p.args.vehicle_id);}
-async function tryLive(){try{var r=await mcpCall('vehicles.list',{});if(r&&r.vehicles){for(var i=0;i<r.vehicles.length;i++){var lv=r.vehicles[i];var lo=V.find(function(x){return x.vehicle_id===lv.vehicle_id});if(lo)Object.assign(lo,lv);}renderM();renderVList();drawMap();document.getElementById('liveBadge').style.display='flex';}}catch(e){}}
+
+function unwrap(raw) {
+  if (raw && raw.content && raw.content[0] && raw.content[0].type === 'text') try { raw = JSON.parse(raw.content[0].text); } catch(e) {}
+  if (raw && raw.content && raw.content[0] && raw.content[0].type === 'text') try { raw = JSON.parse(raw.content[0].text); } catch(e) {}
+  return raw;
+}
+
+function mcpCall(tool, args) {
+  var requestId = 'req_' + (++counter) + '_' + Date.now();
+  return new Promise(function(resolve, reject) {
+    var timeout = setTimeout(function() { delete pending[requestId]; reject(new Error('timeout')); }, 10000);
+    pending[requestId] = {
+      resolve: function(r) { clearTimeout(timeout); resolve(r); },
+      reject: function(e) { clearTimeout(timeout); reject(e); }
+    };
+    window.parent.postMessage({
+      source: 'adas-plugin',
+      message: { action: 'mcp-call', payload: { requestId: requestId, toolName: 'cp.fe_api',
+        args: { method: 'mcpProxy', params: { connectorId: 'fleet-mcp', tool: tool, args: args || {} } } } }
+    }, '*');
+  });
+}
+
+function handleCommand(payload) {
+  if (payload.command === 'focus_vehicle' && payload.args && payload.args.vehicle_id) {
+    selectVehicle(payload.args.vehicle_id);
+  }
+}
+
+async function tryLiveData() {
+  try {
+    var result = await mcpCall('vehicles.list', {});
+    if (result && result.vehicles) {
+      // Merge live position data
+      for (var i = 0; i < result.vehicles.length; i++) {
+        var live = result.vehicles[i];
+        var local = VEHICLES.find(function(v) { return v.vehicle_id === live.vehicle_id; });
+        if (local) { Object.assign(local, live); }
+      }
+      renderMetrics();
+      renderVehicleList();
+      document.getElementById('liveBadge').style.display = 'flex';
+    }
+  } catch(e) { /* Silent — mobile will hit this */ }
+}
 </script>
 </body></html>
