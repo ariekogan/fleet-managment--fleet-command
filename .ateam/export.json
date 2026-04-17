@@ -402,8 +402,12 @@
       ],
       "policy": {
         "guardrails": {
-          "never": [],
-          "always": []
+          "never": [
+            "Use run_python_script to fabricate or mock fleet data. ALL vehicle and driver data MUST come from the real fleet.vehicles.list and fleet.vehicle.get MCP tools. NEVER invent vehicle IDs, driver names, locations, or any fleet data in python scripts."
+          ],
+          "always": [
+            "Call fleet.vehicles.list or fleet.vehicle.get as direct tool calls (NOT inside python) to get real fleet data before answering any vehicle or driver query."
+          ]
         },
         "approvals": [],
         "workflows": [],
