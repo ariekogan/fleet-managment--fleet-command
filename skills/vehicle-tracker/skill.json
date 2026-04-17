@@ -1,54 +1,27 @@
 {
-  "description": "Real-time vehicle tracking, location queries, fleet status overview, and geofence monitoring.",
-  "version": "1.0.0",
+  "id": "vehicle-tracker",
+  "name": "Vehicle Tracker",
+  "description": "Fleet orchestrator — real-time vehicle tracking, fleet status, geofence monitoring. Routes optimization and safety requests to specialist workers.",
+  "version": "2.0.0",
   "phase": "DEPLOYED",
   "problem": {
-    "statement": "Fleet managers need real-time visibility into vehicle locations, status, and geofence compliance.",
-    "context": "Commercial fleet with 15+ vehicles in the Tel Aviv metropolitan area.",
+    "statement": "Fleet managers need a single entry point for all fleet operations — vehicle tracking, route optimization, and safety monitoring.",
+    "context": "Commercial fleet with 15+ vehicles in the Tel Aviv metropolitan area. This skill is the orchestrator that handles vehicle queries directly and delegates route/safety requests to worker skills.",
     "goals": [
       "Provide real-time vehicle positions and status",
       "Monitor geofence compliance",
-      "Enable quick vehicle lookup"
+      "Route optimization requests to route-optimizer skill",
+      "Route safety queries to safety-monitor skill"
     ]
   },
-  "scenarios": [
-    {
-      "id": "locate_vehicle",
-      "title": "Find the current location and status of a vehicle",
-      "description": "Test scenario for locate vehicle",
-      "steps": [
-        "User says: \"Where is VH-003?\"",
-        "Agent presents results to the user"
-      ],
-      "expected_outcome": "User request for locate vehicle is handled successfully."
-    },
-    {
-      "id": "fleet_status",
-      "title": "Get an overview of fleet status",
-      "description": "Test scenario for fleet status",
-      "steps": [
-        "User says: \"Show me all vehicles\"",
-        "Agent presents results to the user"
-      ],
-      "expected_outcome": "User request for fleet status is handled successfully."
-    },
-    {
-      "id": "geofence_check",
-      "title": "Check geofence compliance",
-      "description": "Test scenario for geofence check",
-      "steps": [
-        "User says: \"Are all vehicles in their zones?\"",
-        "Agent presents results to the user"
-      ],
-      "expected_outcome": "User request for geofence check is handled successfully."
-    }
-  ],
   "role": {
-    "name": "Fleet Tracking Specialist",
-    "persona": "You are an efficient fleet tracking specialist. Keep responses concise with key data. Include vehicle ID and status in responses.",
+    "name": "Fleet Command Orchestrator",
+    "persona": "You are the central coordinator for a fleet management system. Handle vehicle tracking and geofence queries directly using your tools. For route optimization, trip creation, or route suggestions — hand off to the route-optimizer skill. For safety alerts or driver safety scores — hand off to the safety-monitor skill. Keep responses concise with key data points.",
     "goals": [
-      "Provide accurate real-time vehicle positions",
-      "Monitor geofence compliance"
+      "Answer vehicle location and status queries directly",
+      "Monitor geofence compliance directly",
+      "Delegate route optimization to route-optimizer",
+      "Delegate safety monitoring to safety-monitor"
     ],
     "limitations": [
       "Cannot contact drivers directly",
@@ -59,7 +32,6 @@
       "verbosity": "concise"
     }
   },
-  "glossary": {},
   "intents": {
     "supported": [
       {
@@ -69,8 +41,7 @@
           "Where is VH-003?",
           "Find truck 42",
           "Locate the vehicle near Herzliya"
-        ],
-        "maps_to_workflow_resolved": true
+        ]
       },
       {
         "id": "fleet_status",
@@ -79,8 +50,7 @@
           "Show me all vehicles",
           "How many trucks are moving?",
           "Fleet overview"
-        ],
-        "maps_to_workflow_resolved": true
+        ]
       },
       {
         "id": "geofence_check",
@@ -88,8 +58,40 @@
         "examples": [
           "Are all vehicles in their zones?",
           "Any geofence violations?"
+        ]
+      },
+      {
+        "id": "route_request",
+        "description": "Route optimization, trip creation, or route suggestion — delegate to route-optimizer",
+        "examples": [
+          "Optimize route for VH-003 to Jerusalem",
+          "Create a trip for VH-001 from Tel Aviv to Haifa",
+          "Show routes from Herzliya to Ashdod",
+          "Best route to Beer Sheva"
         ],
-        "maps_to_workflow_resolved": true
+        "action": "handoff",
+        "target_skill": "route-optimizer"
+      },
+      {
+        "id": "safety_request",
+        "description": "Safety alerts or driver safety score — delegate to safety-monitor",
+        "examples": [
+          "Any safety alerts?",
+          "Show critical alerts",
+          "Safety score for Yossi Cohen",
+          "How is VH-007 driver doing?"
+        ],
+        "action": "handoff",
+        "target_skill": "safety-monitor"
+      },
+      {
+        "id": "show_dashboard",
+        "description": "Show the fleet dashboard UI",
+        "examples": [
+          "Show the fleet dashboard",
+          "Open the dashboard",
+          "Show me the fleet overview panel"
+        ]
       }
     ],
     "thresholds": {
@@ -98,8 +100,8 @@
       "reject": 0.3
     },
     "out_of_domain": {
-      "action": "redirect",
-      "message": ""
+      "action": "reject",
+      "message": "I can help with vehicle tracking, route optimization, and safety monitoring. What would you like to know about your fleet?"
     }
   },
   "engine": {
@@ -154,7 +156,6 @@
     "model": "claude-sonnet-4-20250514",
     "temperature": 0.2
   },
-  "toolbox_imports": [],
   "tools": [
     {
       "id": "tool-vehicle-get",
@@ -171,7 +172,7 @@
       ],
       "output": {
         "type": "object",
-        "description": "Result"
+        "description": "Vehicle data with position, speed, fuel, status"
       },
       "source": {
         "type": "mcp_bridge",
@@ -180,26 +181,6 @@
       },
       "policy": {
         "allowed": "always"
-      },
-      "mock": {
-        "enabled": true,
-        "mode": "examples",
-        "examples": [
-          {
-            "id": "tool-vehicle-get-auto",
-            "input": {
-              "vehicle_id": "id-001"
-            },
-            "output": {
-              "success": true,
-              "data": {}
-            },
-            "description": "Auto-generated example for fleet.vehicle.get"
-          }
-        ]
-      },
-      "security": {
-        "classification": "public"
       }
     },
     {
@@ -229,7 +210,7 @@
       ],
       "output": {
         "type": "object",
-        "description": "Result"
+        "description": "List of vehicles with status summary"
       },
       "source": {
         "type": "mcp_bridge",
@@ -238,29 +219,6 @@
       },
       "policy": {
         "allowed": "always"
-      },
-      "mock": {
-        "enabled": true,
-        "mode": "examples",
-        "examples": [
-          {
-            "id": "tool-vehicles-list-auto",
-            "input": {},
-            "output": {
-              "results": [
-                {
-                  "id": 1,
-                  "name": "Example item"
-                }
-              ],
-              "total_count": 1
-            },
-            "description": "Auto-generated example for fleet.vehicles.list"
-          }
-        ]
-      },
-      "security": {
-        "classification": "public"
       }
     },
     {
@@ -284,7 +242,7 @@
       ],
       "output": {
         "type": "object",
-        "description": "Result"
+        "description": "Geofence compliance status and violations"
       },
       "source": {
         "type": "mcp_bridge",
@@ -293,205 +251,19 @@
       },
       "policy": {
         "allowed": "always"
-      },
-      "mock": {
-        "enabled": true,
-        "mode": "examples",
-        "examples": [
-          {
-            "id": "tool-geofence-check-auto",
-            "input": {},
-            "output": {
-              "success": true,
-              "data": {}
-            },
-            "description": "Auto-generated example for fleet.geofence.check"
-          }
-        ]
-      },
-      "security": {
-        "classification": "public"
-      }
-    },
-    {
-      "id": "tool-trip-create",
-      "id_status": "permanent",
-      "name": "fleet.trip.create",
-      "description": "Create a new trip assignment for a vehicle.",
-      "inputs": [
-        {
-          "name": "vehicle_id",
-          "type": "string",
-          "required": true,
-          "description": "Vehicle to assign"
-        },
-        {
-          "name": "origin",
-          "type": "string",
-          "required": true,
-          "description": "Trip starting location"
-        },
-        {
-          "name": "destination",
-          "type": "string",
-          "required": true,
-          "description": "Trip destination"
-        }
-      ],
-      "output": {
-        "type": "object",
-        "description": "Result"
-      },
-      "source": {
-        "type": "mcp_bridge",
-        "connection_id": "fleet-mcp",
-        "mcp_tool": "trip.create"
-      },
-      "policy": {
-        "allowed": "always"
-      },
-      "mock": {
-        "enabled": true,
-        "mode": "examples",
-        "examples": [
-          {
-            "id": "tool-trip-create-auto",
-            "input": {
-              "vehicle_id": "id-001",
-              "origin": "example",
-              "destination": "example"
-            },
-            "output": {
-              "id": 1,
-              "status": "created",
-              "message": "Created successfully."
-            },
-            "description": "Auto-generated example for fleet.trip.create"
-          }
-        ]
-      },
-      "security": {
-        "classification": "public"
-      }
-    },
-    {
-      "id": "tool-route-optimize",
-      "id_status": "permanent",
-      "name": "fleet.route.optimize",
-      "description": "Calculate the optimal route for a vehicle.",
-      "inputs": [
-        {
-          "name": "vehicle_id",
-          "type": "string",
-          "required": true,
-          "description": "Vehicle to route"
-        },
-        {
-          "name": "destination",
-          "type": "string",
-          "required": true,
-          "description": "Destination"
-        },
-        {
-          "name": "optimize_for",
-          "type": "string",
-          "required": false,
-          "description": "time, distance, or fuel"
-        }
-      ],
-      "output": {
-        "type": "object",
-        "description": "Result"
-      },
-      "source": {
-        "type": "mcp_bridge",
-        "connection_id": "fleet-mcp",
-        "mcp_tool": "route.optimize"
-      },
-      "policy": {
-        "allowed": "always"
-      },
-      "mock": {
-        "enabled": true,
-        "mode": "examples",
-        "examples": [
-          {
-            "id": "tool-route-optimize-auto",
-            "input": {
-              "vehicle_id": "id-001",
-              "destination": "example"
-            },
-            "output": {
-              "success": true,
-              "data": {}
-            },
-            "description": "Auto-generated example for fleet.route.optimize"
-          }
-        ]
-      },
-      "security": {
-        "classification": "public"
-      }
-    },
-    {
-      "id": "tool-route-suggest",
-      "id_status": "permanent",
-      "name": "fleet.route.suggest",
-      "description": "Suggest route alternatives between two points.",
-      "inputs": [
-        {
-          "name": "origin",
-          "type": "string",
-          "required": true,
-          "description": "Start point"
-        },
-        {
-          "name": "destination",
-          "type": "string",
-          "required": true,
-          "description": "End point"
-        }
-      ],
-      "output": {
-        "type": "object",
-        "description": "Result"
-      },
-      "source": {
-        "type": "mcp_bridge",
-        "connection_id": "fleet-mcp",
-        "mcp_tool": "route.suggest"
-      },
-      "policy": {
-        "allowed": "always"
-      },
-      "mock": {
-        "enabled": true,
-        "mode": "examples",
-        "examples": [
-          {
-            "id": "tool-route-suggest-auto",
-            "input": {
-              "origin": "example",
-              "destination": "example"
-            },
-            "output": {
-              "success": true,
-              "data": {}
-            },
-            "description": "Auto-generated example for fleet.route.suggest"
-          }
-        ]
-      },
-      "security": {
-        "classification": "public"
       }
     }
   ],
   "meta_tools": [],
   "triggers": [],
   "connectors": [
-    "fleet-mcp",
-    "handoff-controller-mcp"
+    "fleet-mcp"
+  ],
+  "ui_plugins": [
+    {
+      "id": "mcp:fleet-mcp:fleet-dashboard",
+      "short_id": "fleet_dash"
+    }
   ],
   "policy": {
     "guardrails": {
@@ -499,38 +271,7 @@
       "always": []
     },
     "approvals": [],
-    "workflows": [
-      {
-        "name": "Find the current location and status of a vehicle",
-        "description": "Auto-generated workflow for locate_vehicle",
-        "trigger": "locate_vehicle",
-        "steps": [],
-        "required": false,
-        "on_deviation": "warn",
-        "id": "find_the_current_location_and_status_of_a_vehicle_68b1013d",
-        "steps_resolved": []
-      },
-      {
-        "name": "Get an overview of fleet status",
-        "description": "Auto-generated workflow for fleet_status",
-        "trigger": "fleet_status",
-        "steps": [],
-        "required": false,
-        "on_deviation": "warn",
-        "id": "get_an_overview_of_fleet_status_653ec940",
-        "steps_resolved": []
-      },
-      {
-        "name": "Check geofence compliance",
-        "description": "Auto-generated workflow for geofence_check",
-        "trigger": "geofence_check",
-        "steps": [],
-        "required": false,
-        "on_deviation": "warn",
-        "id": "check_geofence_compliance_b191b6fe",
-        "steps_resolved": []
-      }
-    ],
+    "workflows": [],
     "escalation": {
       "enabled": true,
       "conditions": [
@@ -541,25 +282,14 @@
     }
   },
   "channels": [],
-  "id": "vehicle-tracker",
-  "name": "Vehicle Tracker",
-  "ui_capable": false,
-  "ui_plugins": [
-    {
-      "id": "mcp:fleet-ui-mcp:fleet-dashboard",
-      "short_id": "fleet_dash"
-    }
-  ],
   "output_contract": {
     "required_fields": [
       "summary",
-      "tools_used",
       "data_source",
       "as_of"
     ],
-    "format_hint": "Include Summary, Tools used, Data source, and As-of in every final response."
+    "format_hint": "Include Summary, Data source, and As-of in every final response."
   },
-  "grant_mappings": [],
   "access_policy": {
     "rules": [
       {
@@ -569,9 +299,5 @@
         "effect": "allow"
       }
     ]
-  },
-  "created_at": "2026-03-01T11:59:17.152Z",
-  "updated_at": "2026-03-14T18:15:56.266Z",
-  "cascading_issues": [],
-  "response_filters": []
+  }
 }

@@ -1,8 +1,9 @@
 {
   "id": "fleet-command",
   "name": "Fleet Command Center",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "AI-powered fleet management with real-time vehicle tracking, route optimization, and driver safety scoring.",
+  "orchestrator_skill": "vehicle-tracker",
   "identity": {
     "actor_types": [
       {
@@ -29,17 +30,18 @@
     {
       "id": "vehicle-tracker",
       "name": "Vehicle Tracker",
-      "role": "gateway",
-      "description": "Real-time vehicle tracking and geofence monitoring.",
+      "role": "orchestrator",
+      "description": "Fleet orchestrator — handles vehicle queries directly, routes optimization and safety requests to worker skills.",
       "connectors": [
-        "fleet-mcp"
+        "fleet-mcp",
+        "handoff-controller-mcp"
       ]
     },
     {
       "id": "route-optimizer",
       "name": "Route Optimizer",
       "role": "worker",
-      "description": "Route optimization for fleet vehicles.",
+      "description": "Route optimization, trip creation, and multi-stop planning.",
       "connectors": [
         "fleet-mcp"
       ]
@@ -84,7 +86,7 @@
       "id": "tracker-to-optimizer",
       "from": "vehicle-tracker",
       "to": "route-optimizer",
-      "trigger": "Route optimization request",
+      "trigger": "Route optimization, trip creation, or route suggestion request",
       "grants_passed": [
         "fleet.vehicle_id"
       ],
@@ -94,7 +96,7 @@
       "id": "tracker-to-safety",
       "from": "vehicle-tracker",
       "to": "safety-monitor",
-      "trigger": "Safety alert escalation",
+      "trigger": "Safety alert check or driver safety score request",
       "grants_passed": [
         "fleet.vehicle_id",
         "fleet.driver_id"
@@ -103,6 +105,9 @@
     }
   ],
   "routing": {
+    "api": {
+      "default_skill": "vehicle-tracker"
+    },
     "telegram": {
       "default_skill": "vehicle-tracker"
     }
@@ -113,16 +118,57 @@
       "required": true,
       "description": "Handoff controller for skill-to-skill transfers",
       "used_by": [
-        "vehicle-tracker",
-        "route-optimizer",
-        "safety-monitor"
+        "vehicle-tracker"
       ]
     },
     {
       "id": "fleet-mcp",
-      "description": "",
+      "description": "Fleet data connector — vehicle tracking, routes, safety, and UI dashboard",
       "required": true,
-      "used_by": []
+      "ui_capable": true,
+      "used_by": [
+        "vehicle-tracker",
+        "route-optimizer",
+        "safety-monitor"
+      ]
+    }
+  ],
+  "ui_plugins": [
+    {
+      "id": "mcp:fleet-mcp:fleet-dashboard",
+      "name": "Fleet Dashboard",
+      "version": "1.0.0",
+      "type": "ui",
+      "render": {
+        "mode": "adaptive",
+        "iframeUrl": "/ui/fleet-dashboard/index.html",
+        "reactNative": {
+          "component": "fleet-dashboard"
+        }
+      },
+      "capabilities": {
+        "location": true
+      },
+      "channels": [
+        "command"
+      ],
+      "commands": [
+        {
+          "name": "focus_vehicle",
+          "description": "Highlight a specific vehicle on the fleet map",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "vehicle_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "vehicle_id"
+            ]
+          }
+        }
+      ]
     }
   ],
   "security_contracts": []

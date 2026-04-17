@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fleet Dashboard</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: #0f1419; color: #e7e9ea; padding: 12px; font-size: 13px; }
+
+  .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .header h1 { font-size: 16px; font-weight: 700; }
+  .live-badge { font-size: 10px; color: #00ba7c; display: none; align-items: center; gap: 4px; }
+  .live-badge::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: #00ba7c; display: inline-block; }
+
+  .metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 12px; }
+  .metric-card { background: #1a1f26; border-radius: 8px; padding: 10px; border: 1px solid #2f3640; }
+  .metric-label { font-size: 10px; color: #71767b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+  .metric-value { font-size: 22px; font-weight: 700; }
+  .metric-value.green { color: #00ba7c; }
+  .metric-value.blue { color: #1d9bf0; }
+  .metric-value.yellow { color: #ffd700; }
+  .metric-value.red { color: #f4212e; }
+
+  .panels { display: grid; grid-template-columns: 1fr 280px; gap: 10px; }
+  @media (max-width: 600px) { .panels { grid-template-columns: 1fr; } .metrics { grid-template-columns: repeat(2, 1fr); } }
+
+  .panel { background: #1a1f26; border-radius: 8px; border: 1px solid #2f3640; overflow: hidden; }
+  .panel-header { font-size: 12px; font-weight: 600; padding: 8px 10px; background: #22272e; border-bottom: 1px solid #2f3640; }
+
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; font-size: 10px; color: #71767b; text-transform: uppercase; padding: 6px 8px; border-bottom: 1px solid #2f3640; }
+  td { padding: 5px 8px; font-size: 12px; border-bottom: 1px solid #1e2730; }
+  tr:hover { background: #22272e; }
+  tr.highlight { background: #1d3a5c; }
+
+  .status { display: inline-block; padding: 1px 6px; border-radius: 10px; font-size: 10px; font-weight: 600; }
+  .status.moving { background: rgba(0,186,124,0.15); color: #00ba7c; }
+  .status.idle { background: rgba(113,118,123,0.15); color: #71767b; }
+  .status.alert { background: rgba(244,33,46,0.15); color: #f4212e; }
+
+  .alert-item { padding: 8px 10px; border-bottom: 1px solid #1e2730; display: flex; align-items: flex-start; gap: 8px; }
+  .alert-item:last-child { border-bottom: none; }
+  .alert-dot { width: 6px; height: 6px; border-radius: 50%; margin-top: 4px; flex-shrink: 0; }
+  .alert-dot.critical { background: #f4212e; }
+  .alert-dot.high { background: #ff6b00; }
+  .alert-dot.medium { background: #ffd700; }
+  .alert-dot.low { background: #71767b; }
+  .alert-text { font-size: 11px; line-height: 1.3; }
+  .alert-meta { font-size: 10px; color: #71767b; margin-top: 2px; }
+
+  .fuel-bar { width: 40px; height: 6px; background: #2f3640; border-radius: 3px; display: inline-block; position: relative; }
+  .fuel-fill { height: 100%; border-radius: 3px; position: absolute; left: 0; top: 0; }
+  .fuel-ok { background: #00ba7c; }
+  .fuel-warn { background: #ffd700; }
+  .fuel-crit { background: #f4212e; }
+</style>
+</head><body>
+
+<div class="header">
+  <h1>Fleet Command</h1>
+  <div class="live-badge" id="liveBadge">LIVE</div>
+</div>
+
+<div class="metrics">
+  <div class="metric-card"><div class="metric-label">Total</div><div class="metric-value blue" id="mTotal">15</div></div>
+  <div class="metric-card"><div class="metric-label">Moving</div><div class="metric-value green" id="mMoving">8</div></div>
+  <div class="metric-card"><div class="metric-label">Idle</div><div class="metric-value yellow" id="mIdle">5</div></div>
+  <div class="metric-card"><div class="metric-label">Alerts</div><div class="metric-value red" id="mAlerts">2</div></div>
+</div>
+
+<div class="panels">
+  <div class="panel">
+    <div class="panel-header">Vehicles</div>
+    <table>
+      <thead><tr><th>ID</th><th>Driver</th><th>Type</th><th>Status</th><th>Speed</th><th>Fuel</th></tr></thead>
+      <tbody id="vehicleTable"></tbody>
+    </table>
+  </div>
+  <div class="panel">
+    <div class="panel-header">Safety Alerts</div>
+    <div id="alertsList"></div>
+  </div>
+</div>
+
+<script>
+// ── EMBEDDED DEFAULTS — renders immediately, works on mobile ──
+var DEFAULT_VEHICLES = [
+  { vehicle_id: 'VH-001', driver: 'Yossi Cohen', type: 'truck', status: 'moving', speed: 85, fuel: 72 },
+  { vehicle_id: 'VH-002', driver: 'David Levy', type: 'van', status: 'idle', speed: 0, fuel: 45 },
+  { vehicle_id: 'VH-003', driver: 'Sarah Mizrahi', type: 'truck', status: 'moving', speed: 65, fuel: 88 },
+  { vehicle_id: 'VH-004', driver: 'Avi Ben-David', type: 'car', status: 'moving', speed: 50, fuel: 60 },
+  { vehicle_id: 'VH-005', driver: 'Rachel Goldstein', type: 'motorcycle', status: 'idle', speed: 0, fuel: 90 },
+  { vehicle_id: 'VH-006', driver: 'Moshe Peretz', type: 'truck', status: 'alert', speed: 0, fuel: 12 },
+  { vehicle_id: 'VH-007', driver: 'Tamar Shapira', type: 'van', status: 'moving', speed: 125, fuel: 55 },
+  { vehicle_id: 'VH-008', driver: 'Eli Dahan', type: 'car', status: 'idle', speed: 0, fuel: 78 },
+  { vehicle_id: 'VH-009', driver: 'Noa Friedman', type: 'motorcycle', status: 'moving', speed: 40, fuel: 65 },
+  { vehicle_id: 'VH-010', driver: 'Oren Avraham', type: 'truck', status: 'idle', speed: 0, fuel: 34 },
+  { vehicle_id: 'VH-011', driver: 'Michal Katz', type: 'van', status: 'moving', speed: 72, fuel: 50 },
+  { vehicle_id: 'VH-012', driver: 'Amit Rosen', type: 'car', status: 'alert', speed: 0, fuel: 8 },
+  { vehicle_id: 'VH-013', driver: 'Yael Schwartz', type: 'motorcycle', status: 'moving', speed: 55, fuel: 82 },
+  { vehicle_id: 'VH-014', driver: 'Dan Agmon', type: 'truck', status: 'idle', speed: 0, fuel: 42 },
+  { vehicle_id: 'VH-015', driver: 'Liat Baruch', type: 'van', status: 'moving', speed: 90, fuel: 67 }
+];
+
+var DEFAULT_ALERTS = [
+  { type: 'sos', severity: 'critical', vehicle_id: 'VH-006', driver: 'Moshe Peretz', message: 'Driver pressed SOS button' },
+  { type: 'speeding', severity: 'high', vehicle_id: 'VH-007', driver: 'Tamar Shapira', speed: 125, limit: 90 },
+  { type: 'geofence_exit', severity: 'high', vehicle_id: 'VH-012', driver: 'Amit Rosen', geofence: 'Tel Aviv Depot' },
+  { type: 'speeding', severity: 'medium', vehicle_id: 'VH-015', driver: 'Liat Baruch', speed: 105, limit: 90 },
+  { type: 'harsh_brake', severity: 'medium', vehicle_id: 'VH-003', driver: 'Sarah Mizrahi' },
+  { type: 'low_fuel', severity: 'low', vehicle_id: 'VH-006', driver: 'Moshe Peretz', fuel_level: 12 }
+];
+
+var highlightedVehicle = null;
+
+function renderMetrics(vehicles) {
+  var moving = 0, idle = 0, alert = 0;
+  for (var i = 0; i < vehicles.length; i++) {
+    if (vehicles[i].status === 'moving') moving++;
+    else if (vehicles[i].status === 'idle') idle++;
+    else if (vehicles[i].status === 'alert') alert++;
+  }
+  document.getElementById('mTotal').textContent = vehicles.length;
+  document.getElementById('mMoving').textContent = moving;
+  document.getElementById('mIdle').textContent = idle;
+  document.getElementById('mAlerts').textContent = alert;
+}
+
+function fuelClass(f) { return f <= 15 ? 'fuel-crit' : f <= 30 ? 'fuel-warn' : 'fuel-ok'; }
+
+function renderVehicles(vehicles) {
+  var html = '';
+  for (var i = 0; i < vehicles.length; i++) {
+    var v = vehicles[i];
+    var hl = v.vehicle_id === highlightedVehicle ? ' highlight' : '';
+    html += '<tr class="' + hl + '">' +
+      '<td><strong>' + v.vehicle_id + '</strong></td>' +
+      '<td>' + v.driver + '</td>' +
+      '<td>' + v.type + '</td>' +
+      '<td><span class="status ' + v.status + '">' + v.status + '</span></td>' +
+      '<td>' + v.speed + ' km/h</td>' +
+      '<td><span class="fuel-bar"><span class="fuel-fill ' + fuelClass(v.fuel) + '" style="width:' + v.fuel + '%"></span></span> ' + v.fuel + '%</td>' +
+      '</tr>';
+  }
+  document.getElementById('vehicleTable').innerHTML = html;
+}
+
+function alertDesc(a) {
+  if (a.type === 'sos') return 'SOS: ' + (a.message || 'Emergency');
+  if (a.type === 'speeding') return 'Speeding: ' + a.speed + ' km/h (limit ' + (a.limit || 90) + ')';
+  if (a.type === 'geofence_exit') return 'Geofence exit: ' + (a.geofence || 'unknown zone');
+  if (a.type === 'harsh_brake') return 'Harsh braking event';
+  if (a.type === 'low_fuel') return 'Low fuel: ' + (a.fuel_level || '?') + '%';
+  return a.type;
+}
+
+function renderAlerts(alerts) {
+  var html = '';
+  for (var i = 0; i < alerts.length; i++) {
+    var a = alerts[i];
+    html += '<div class="alert-item">' +
+      '<div class="alert-dot ' + a.severity + '"></div>' +
+      '<div><div class="alert-text">' + alertDesc(a) + '</div>' +
+      '<div class="alert-meta">' + a.vehicle_id + ' - ' + a.driver + '</div></div></div>';
+  }
+  document.getElementById('alertsList').innerHTML = html;
+}
+
+function renderAll(vehicles, alerts) {
+  renderMetrics(vehicles);
+  renderVehicles(vehicles);
+  renderAlerts(alerts);
+}
+
+// Render immediately with defaults
+renderAll(DEFAULT_VEHICLES, DEFAULT_ALERTS);
+
+// ── POSTMESSAGE BRIDGE — silently try live data on web ──
+var hostReady = false;
+var counter = 0;
+var pending = {};
+
+window.addEventListener('message', function(ev) {
+  var d = ev.data || {};
+  if (d.source === 'adas-host') {
+    var msg = d.message;
+    if (msg && msg.type === 'init') {
+      hostReady = true;
+      tryLiveData();
+    }
+    if (msg && msg.type === 'mcp-result' && msg.payload) {
+      var p = pending[msg.payload.requestId];
+      if (p) {
+        delete pending[msg.payload.requestId];
+        if (msg.payload.error) p.reject(msg.payload.error);
+        else p.resolve(unwrap(msg.payload.result));
+      }
+    }
+    if (msg && msg.type === 'plugin-command' && msg.payload) {
+      handleCommand(msg.payload);
+    }
+  }
+});
+
+function unwrap(raw) {
+  if (raw && raw.content && raw.content[0] && raw.content[0].type === 'text') {
+    try { raw = JSON.parse(raw.content[0].text); } catch(e) {}
+  }
+  if (raw && raw.content && raw.content[0] && raw.content[0].type === 'text') {
+    try { raw = JSON.parse(raw.content[0].text); } catch(e) {}
+  }
+  return raw;
+}
+
+function mcpCall(tool, args) {
+  var requestId = 'req_' + (++counter) + '_' + Date.now();
+  return new Promise(function(resolve, reject) {
+    var timeout = setTimeout(function() { delete pending[requestId]; reject(new Error('timeout')); }, 10000);
+    pending[requestId] = {
+      resolve: function(r) { clearTimeout(timeout); resolve(r); },
+      reject: function(e) { clearTimeout(timeout); reject(e); }
+    };
+    window.parent.postMessage({
+      source: 'adas-plugin',
+      message: { action: 'mcp-call', payload: { requestId: requestId, toolName: 'cp.fe_api',
+        args: { method: 'mcpProxy', params: { connectorId: 'fleet-mcp', tool: tool, args: args || {} } } } }
+    }, '*');
+  });
+}
+
+function handleCommand(payload) {
+  if (payload.command === 'focus_vehicle' && payload.args && payload.args.vehicle_id) {
+    highlightedVehicle = payload.args.vehicle_id;
+    renderVehicles(DEFAULT_VEHICLES);
+    var row = document.querySelector('tr.highlight');
+    if (row) row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+}
+
+async function tryLiveData() {
+  try {
+    var result = await mcpCall('vehicles.list', {});
+    if (result && result.vehicles) {
+      DEFAULT_VEHICLES.length = 0;
+      for (var i = 0; i < result.vehicles.length; i++) DEFAULT_VEHICLES.push(result.vehicles[i]);
+      var alerts = await mcpCall('safety.alerts', {});
+      if (Array.isArray(alerts)) DEFAULT_ALERTS.length = 0;
+      if (Array.isArray(alerts)) for (var j = 0; j < alerts.length; j++) DEFAULT_ALERTS.push(alerts[j]);
+      renderAll(DEFAULT_VEHICLES, DEFAULT_ALERTS);
+      document.getElementById('liveBadge').style.display = 'flex';
+    }
+  } catch(e) {
+    // Silent — mobile will hit this, that's OK
+  }
+}
+</script>
+</body></html>

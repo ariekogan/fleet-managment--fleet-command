@@ -44,6 +44,8 @@ const TOOLS = {
   'route.suggest': { description: 'Suggest route alternatives.', inputSchema: { type: 'object', properties: { origin: { type: 'string' }, destination: { type: 'string' } }, required: ['origin', 'destination'] } },
   'safety.alerts': { description: 'Get safety alerts.', inputSchema: { type: 'object', properties: { vehicle_id: { type: 'string' }, severity: { type: 'string' }, limit: { type: 'number' } } } },
   'safety.score': { description: 'Calculate driver safety score.', inputSchema: { type: 'object', properties: { driver_name: { type: 'string' }, vehicle_id: { type: 'string' }, period_days: { type: 'number' } } } },
+  'ui.listPlugins': { description: 'List available UI plugins.', inputSchema: { type: 'object', properties: {} } },
+  'ui.getPlugin': { description: 'Get manifest for a specific UI plugin.', inputSchema: { type: 'object', properties: { plugin_id: { type: 'string', description: 'Plugin ID' } }, required: ['plugin_id'] } },
 };
 
 function handleToolCall(name, args) {
@@ -57,12 +59,14 @@ function handleToolCall(name, args) {
     case 'route.suggest': { var base = Math.round(30 + Math.random() * 100); result = [ { route: 'Highway 2 (Coastal)', distance_km: base, estimated_time_min: Math.round(base * 0.7), fuel_liters: Math.round(base * 0.11 * 10) / 10, traffic: 'moderate' }, { route: 'Highway 4 (Geha)', distance_km: base + 8, estimated_time_min: Math.round((base + 8) * 0.65), fuel_liters: Math.round((base + 8) * 0.10 * 10) / 10, traffic: 'light' }, { route: 'Route 40 (Ayalon)', distance_km: base - 5, estimated_time_min: Math.round((base - 5) * 0.9), fuel_liters: Math.round((base - 5) * 0.13 * 10) / 10, traffic: 'heavy' } ]; break; }
     case 'safety.alerts': { var alerts = [ { type: 'speeding', severity: 'high', vehicle_id: 'VH-007', driver: 'Tamar Shapira', speed: 125, limit: 90, time: now() }, { type: 'harsh_brake', severity: 'medium', vehicle_id: 'VH-003', driver: 'Sarah Mizrahi', deceleration: -8.5, time: now() }, { type: 'geofence_exit', severity: 'high', vehicle_id: 'VH-012', driver: 'Amit Rosen', geofence: 'Tel Aviv Depot', time: now() }, { type: 'low_fuel', severity: 'low', vehicle_id: 'VH-006', driver: 'Moshe Peretz', fuel_level: 12, time: now() }, { type: 'speeding', severity: 'medium', vehicle_id: 'VH-015', driver: 'Liat Baruch', speed: 105, limit: 90, time: now() }, { type: 'sos', severity: 'critical', vehicle_id: 'VH-006', driver: 'Moshe Peretz', time: now(), message: 'Driver pressed SOS button' } ]; if (args.vehicle_id) alerts = alerts.filter(function(a) { return a.vehicle_id === args.vehicle_id; }); if (args.severity) alerts = alerts.filter(function(a) { return a.severity === args.severity; }); result = alerts.slice(0, args.limit || 20); break; }
     case 'safety.score': { var driver = args.driver_name; if (!driver && args.vehicle_id) { var v = VEHICLES.find(function(x) { return x.vehicle_id === args.vehicle_id; }); if (v) driver = v.driver; } if (!driver) { result = { error: 'Provide driver_name or vehicle_id' }; break; } var score = Math.round(60 + Math.random() * 35); result = { driver: driver, score: score, rating: score >= 90 ? 'excellent' : score >= 75 ? 'good' : score >= 60 ? 'fair' : 'needs_improvement', period_days: args.period_days || 30, events: { speeding: Math.floor(Math.random() * 5), harsh_brake: Math.floor(Math.random() * 4) }, trend: Math.random() > 0.5 ? 'improving' : 'stable' }; break; }
+    case 'ui.listPlugins': { result = { plugins: [{ id: 'fleet-dashboard', name: 'Fleet Dashboard', version: '1.0.0', description: 'Real-time fleet overview with vehicle status, alerts, and metrics' }] }; break; }
+    case 'ui.getPlugin': { result = { id: 'fleet-dashboard', name: 'Fleet Dashboard', version: '1.0.0', description: 'Real-time fleet overview with vehicle status, alerts, and metrics', render: { mode: 'adaptive', iframeUrl: '/ui/fleet-dashboard/index.html', reactNative: { component: 'fleet-dashboard' } }, channels: ['command'], capabilities: { commands: [{ name: 'focus_vehicle', description: 'Highlight a specific vehicle', input_schema: { type: 'object', properties: { vehicle_id: { type: 'string' } }, required: ['vehicle_id'] } }] } }; break; }
     default: result = { error: 'Unknown tool: ' + name };
   }
   return { content: [{ type: 'text', text: JSON.stringify(result) }], isError: !!(result && result.error) };
 }
 
-function handleInitialize() { return { protocolVersion: '2024-11-05', capabilities: { tools: {} }, serverInfo: { name: 'fleet-mcp', version: '1.0.0' } }; }
+function handleInitialize() { return { protocolVersion: '2024-11-05', capabilities: { tools: {}, ui: {} }, serverInfo: { name: 'fleet-mcp', version: '2.0.0' } }; }
 function handleToolsList() { return { tools: Object.entries(TOOLS).map(function(e) { return { name: e[0], description: e[1].description, inputSchema: e[1].inputSchema }; }) }; }
 
 var buffer = '';

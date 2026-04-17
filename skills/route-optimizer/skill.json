@@ -1,44 +1,25 @@
 {
-  "description": "Route optimization and multi-stop planning.",
-  "version": "1.0.0",
+  "id": "route-optimizer",
+  "name": "Route Optimizer",
+  "description": "Route optimization, trip creation, and multi-stop planning.",
+  "version": "2.0.0",
   "phase": "DEPLOYED",
   "problem": {
-    "statement": "Dispatchers need optimized routes.",
-    "context": "Dispatchers need optimized routes.",
+    "statement": "Dispatchers need optimized routes and trip management for fleet vehicles.",
+    "context": "Fleet vehicles operate in the Tel Aviv metropolitan area. This worker skill handles all route and trip operations.",
     "goals": [
       "Calculate optimal routes",
-      "Provide route alternatives"
+      "Provide route alternatives",
+      "Create and manage trip assignments"
     ]
   },
-  "scenarios": [
-    {
-      "id": "optimize_route",
-      "title": "Optimize route for a vehicle",
-      "description": "Test scenario for optimize route",
-      "steps": [
-        "User says: \"Optimize route for VH-003 to Jerusalem\"",
-        "Agent calls fleet.route.optimize — calculate optimal route.",
-        "Agent presents results to the user"
-      ],
-      "expected_outcome": "User request for optimize route is handled successfully."
-    },
-    {
-      "id": "suggest_routes",
-      "title": "Get route suggestions",
-      "description": "Test scenario for suggest routes",
-      "steps": [
-        "User says: \"Show routes from Herzliya to Ashdod\"",
-        "Agent presents results to the user"
-      ],
-      "expected_outcome": "User request for suggest routes is handled successfully."
-    }
-  ],
   "role": {
     "name": "Route Optimization Specialist",
-    "persona": "You analyze traffic, distance, and vehicle constraints. Suggest best routes with clear ETA estimates.",
+    "persona": "You analyze traffic, distance, and vehicle constraints. Suggest best routes with clear ETA estimates. You can also create trip assignments for vehicles. Keep responses concise with key metrics.",
     "goals": [
-      "Optimize routes",
-      "Provide alternatives"
+      "Optimize routes for fleet vehicles",
+      "Provide route alternatives with trade-offs",
+      "Create trip assignments"
     ],
     "limitations": [
       "Cannot override driver navigation"
@@ -48,26 +29,34 @@
       "verbosity": "concise"
     }
   },
-  "glossary": {},
   "intents": {
     "supported": [
       {
         "id": "optimize_route",
-        "description": "Optimize route for a vehicle",
+        "description": "Optimize route for a vehicle to a destination",
         "examples": [
           "Optimize route for VH-003 to Jerusalem",
-          "Best route to Haifa"
-        ],
-        "maps_to_workflow_resolved": true
+          "Best route to Haifa for VH-001",
+          "Fastest route to Beer Sheva"
+        ]
       },
       {
         "id": "suggest_routes",
-        "description": "Get route suggestions",
+        "description": "Get route suggestions between two points",
         "examples": [
           "Show routes from Herzliya to Ashdod",
-          "Compare routes to Beer Sheva"
-        ],
-        "maps_to_workflow_resolved": true
+          "Compare routes to Beer Sheva",
+          "What are my options from Tel Aviv to Haifa?"
+        ]
+      },
+      {
+        "id": "create_trip",
+        "description": "Create a trip assignment for a vehicle",
+        "examples": [
+          "Create a trip for VH-001 from Tel Aviv to Haifa",
+          "Assign VH-005 to deliver from Ramat Gan to Jerusalem",
+          "Schedule a trip for VH-003"
+        ]
       }
     ],
     "thresholds": {
@@ -132,13 +121,12 @@
     "model": "claude-sonnet-4-20250514",
     "temperature": 0.2
   },
-  "toolbox_imports": [],
   "tools": [
     {
       "id": "tool-route-optimize-2",
       "id_status": "permanent",
       "name": "fleet.route.optimize",
-      "description": "Calculate optimal route.",
+      "description": "Calculate optimal route for a vehicle to a destination.",
       "inputs": [
         {
           "name": "vehicle_id",
@@ -161,7 +149,7 @@
       ],
       "output": {
         "type": "object",
-        "description": "Result"
+        "description": "Optimized route with distance, time, and fuel estimate"
       },
       "source": {
         "type": "mcp_bridge",
@@ -170,51 +158,30 @@
       },
       "policy": {
         "allowed": "always"
-      },
-      "mock": {
-        "enabled": true,
-        "mode": "examples",
-        "examples": [
-          {
-            "id": "tool-route-optimize-auto",
-            "input": {
-              "vehicle_id": "id-001",
-              "destination": "example"
-            },
-            "output": {
-              "success": true,
-              "data": {}
-            },
-            "description": "Auto-generated example for fleet.route.optimize"
-          }
-        ]
-      },
-      "security": {
-        "classification": "public"
       }
     },
     {
       "id": "tool-route-suggest-2",
       "id_status": "permanent",
       "name": "fleet.route.suggest",
-      "description": "Suggest route alternatives.",
+      "description": "Suggest route alternatives between two points with traffic and fuel comparisons.",
       "inputs": [
         {
           "name": "origin",
           "type": "string",
           "required": true,
-          "description": "Start"
+          "description": "Start point"
         },
         {
           "name": "destination",
           "type": "string",
           "required": true,
-          "description": "End"
+          "description": "End point"
         }
       ],
       "output": {
         "type": "object",
-        "description": "Result"
+        "description": "Array of route alternatives with distance, time, fuel, and traffic"
       },
       "source": {
         "type": "mcp_bridge",
@@ -223,27 +190,44 @@
       },
       "policy": {
         "allowed": "always"
+      }
+    },
+    {
+      "id": "tool-trip-create",
+      "id_status": "permanent",
+      "name": "fleet.trip.create",
+      "description": "Create a new trip assignment for a vehicle.",
+      "inputs": [
+        {
+          "name": "vehicle_id",
+          "type": "string",
+          "required": true,
+          "description": "Vehicle to assign"
+        },
+        {
+          "name": "origin",
+          "type": "string",
+          "required": true,
+          "description": "Trip starting location"
+        },
+        {
+          "name": "destination",
+          "type": "string",
+          "required": true,
+          "description": "Trip destination"
+        }
+      ],
+      "output": {
+        "type": "object",
+        "description": "Created trip with ID, driver, and estimated duration"
       },
-      "mock": {
-        "enabled": true,
-        "mode": "examples",
-        "examples": [
-          {
-            "id": "tool-route-suggest-auto",
-            "input": {
-              "origin": "example",
-              "destination": "example"
-            },
-            "output": {
-              "success": true,
-              "data": {}
-            },
-            "description": "Auto-generated example for fleet.route.suggest"
-          }
-        ]
+      "source": {
+        "type": "mcp_bridge",
+        "connection_id": "fleet-mcp",
+        "mcp_tool": "trip.create"
       },
-      "security": {
-        "classification": "public"
+      "policy": {
+        "allowed": "always"
       }
     }
   ],
@@ -258,32 +242,7 @@
       "always": []
     },
     "approvals": [],
-    "workflows": [
-      {
-        "name": "Optimize route for a vehicle",
-        "description": "Auto-generated workflow for optimize_route",
-        "trigger": "optimize_route",
-        "steps": [
-          "fleet.route.optimize"
-        ],
-        "required": false,
-        "on_deviation": "warn",
-        "id": "optimize_route_for_a_vehicle_e996afab",
-        "steps_resolved": [
-          true
-        ]
-      },
-      {
-        "name": "Get route suggestions",
-        "description": "Auto-generated workflow for suggest_routes",
-        "trigger": "suggest_routes",
-        "steps": [],
-        "required": false,
-        "on_deviation": "warn",
-        "id": "get_route_suggestions_acc936cb",
-        "steps_resolved": []
-      }
-    ],
+    "workflows": [],
     "escalation": {
       "enabled": false,
       "conditions": [],
@@ -291,8 +250,6 @@
     }
   },
   "channels": [],
-  "id": "route-optimizer",
-  "name": "Route Optimizer",
   "access_policy": {
     "rules": [
       {
@@ -302,10 +259,5 @@
         "effect": "allow"
       }
     ]
-  },
-  "created_at": "2026-03-01T11:59:17.216Z",
-  "updated_at": "2026-03-14T18:16:02.990Z",
-  "ui_capable": false,
-  "grant_mappings": [],
-  "response_filters": []
+  }
 }
