@@ -279,7 +279,36 @@
       ]
     },
     "approvals": [],
-    "workflows": [],
+    "workflows": [
+      {
+        "name": "Locate vehicle or driver",
+        "trigger": "locate_vehicle",
+        "steps": [
+          "fleet.vehicles.list",
+          "fleet.vehicle.get"
+        ],
+        "required": true,
+        "on_deviation": "block"
+      },
+      {
+        "name": "Fleet status overview",
+        "trigger": "fleet_status",
+        "steps": [
+          "fleet.vehicles.list"
+        ],
+        "required": true,
+        "on_deviation": "block"
+      },
+      {
+        "name": "Geofence compliance check",
+        "trigger": "geofence_check",
+        "steps": [
+          "fleet.geofence.check"
+        ],
+        "required": true,
+        "on_deviation": "block"
+      }
+    ],
     "escalation": {
       "enabled": true,
       "conditions": [
